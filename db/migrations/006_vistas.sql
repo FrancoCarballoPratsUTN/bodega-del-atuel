@@ -1,59 +1,71 @@
--- 1. Vista de Stock total por vino
--- Combina el stock del depósito central con el stock sumado de todas las salas de venta.
-CREATE OR REPLACE VIEW v_stock_total_vino AS
+--Vista: Stock total por vino
+CREATE OR REPLACE VIEW stock_total_vino AS
 SELECT 
-    v.cod_vino,
-    v.nombre,
-    v.aniada,
-    v.volumen,
-    COALESCE(sd.cantidad, 0) AS stock_deposito,
-    COALESCE(SUM(ss.cantidad), 0) AS stock_salas,
-    COALESCE(sd.cantidad, 0) + COALESCE(SUM(ss.cantidad), 0) AS stock_total
+    tabla_vino.cod_vino AS codigo_vino,
+    tabla_vino.nombre AS nombre_vino,
+    tabla_vino.aniada AS anio_cosecha_vino,
+    tabla_vino.volumen AS volumen_contenido_vino,
+    COALESCE(tabla_stock_deposito.cantidad, 0) AS cantidad_stock_deposito_central,
+    COALESCE(SUM(tabla_stock_sala.cantidad), 0) AS cantidad_stock_todas_las_salas,
+    COALESCE(tabla_stock_deposito.cantidad, 0) + COALESCE(SUM(tabla_stock_sala.cantidad), 0) AS cantidad_stock_total_general
 FROM 
-    vino v
-LEFT JOIN stock_deposito sd ON v.cod_vino = sd.cod_vino
-LEFT JOIN stock_sala ss ON v.cod_vino = ss.cod_vino
+    vino AS tabla_vino
+LEFT JOIN stock_deposito AS tabla_stock_deposito 
+    ON tabla_vino.cod_vino = tabla_stock_deposito.cod_vino
+LEFT JOIN stock_sala AS tabla_stock_sala 
+    ON tabla_vino.cod_vino = tabla_stock_sala.cod_vino
 GROUP BY 
-    v.cod_vino, v.nombre, v.aniada, v.volumen, sd.cantidad;
+    tabla_vino.cod_vino, 
+    tabla_vino.nombre, 
+    tabla_vino.aniada, 
+    tabla_vino.volumen, 
+    tabla_stock_deposito.cantidad;
 
 
--- 2. Vista Materializada de Ventas mensuales por sala 
--- Como los datos viejos de meses anteriores no cambian,mejora
--- el rendimiento cuando la API solicite reportes estadísticos.
-CREATE MATERIALIZED VIEW mv_ventas_mensuales_sala AS
+--Vista Materializada: Ventas mensuales por sala
+CREATE MATERIALIZED VIEW ventas_mensuales_sala AS
 SELECT 
-    s.id_sala,
-    l.nombre AS localidad,
-    EXTRACT(YEAR FROM c.fecha) AS anio,
-    EXTRACT(MONTH FROM c.fecha) AS mes,
-    COUNT(c.nro_comprobante) AS cantidad_ventas,
-    SUM(c.total) AS total_recaudado
+    tabla_sala_venta.id_sala AS id_sala_venta,
+    tabla_localidad.nombre AS nombre_localidad_sala,
+    EXTRACT(YEAR FROM tabla_comprobante.fecha) AS anio_facturacion_venta,
+    EXTRACT(MONTH FROM tabla_comprobante.fecha) AS mes_facturacion_venta,
+    COUNT(tabla_comprobante.nro_comprobante) AS cantidad_ventas_concretadas,
+    SUM(tabla_comprobante.total) AS monto_total_recaudado
 FROM 
-    sala_venta s
-JOIN localidad l ON s.cp_localidad = l.cp
-JOIN comprobante c ON s.id_sala = c.id_sala
+    sala_venta AS tabla_sala_venta
+JOIN localidad AS tabla_localidad 
+    ON tabla_sala_venta.cp_localidad = tabla_localidad.cp
+JOIN comprobante AS tabla_comprobante 
+    ON tabla_sala_venta.id_sala = tabla_comprobante.id_sala
+WHERE 
+    tabla_comprobante.estado = 'procesado'
 GROUP BY 
-    s.id_sala, l.nombre, EXTRACT(YEAR FROM c.fecha), EXTRACT(MONTH FROM c.fecha)
+    tabla_sala_venta.id_sala, 
+    tabla_localidad.nombre, 
+    EXTRACT(YEAR FROM tabla_comprobante.fecha), 
+    EXTRACT(MONTH FROM tabla_comprobante.fecha)
 ORDER BY 
-    anio DESC, mes DESC, total_recaudado DESC;
+    anio_facturacion_venta DESC, 
+    mes_facturacion_venta DESC, 
+    monto_total_recaudado DESC
+WITH DATA;
 
-
--- 3. Vista de Documentos pendientes
--- Unifica los ingresos y las transferencias que aún no han sido procesados 
--- (es decir, los que están "En confección" o "Terminados") usando UNION ALL para armar un panel de control.
-CREATE OR REPLACE VIEW v_documentos_pendientes AS
+--Vista: Documentos pendientes
+CREATE OR REPLACE VIEW documentos_pendientes AS
 SELECT 
-    'Ingreso' AS tipo_documento,
-    cod_ingreso AS numero_documento,
-    fecha::DATE AS fecha_creacion,
-    estado
+    'Ingreso' AS tipo_documento_pendiente,
+    ingreso.cod_ingreso AS numero_documento_pendiente,
+    ingreso.fecha::DATE AS fecha_creacion_documento,
+    ingreso.estado AS estado_actual_documento
 FROM ingreso
-WHERE estado != 'Procesado'
+WHERE ingreso.estado != 'procesado'
+
 UNION ALL
+
 SELECT 
-    'Transferencia' AS tipo_documento,
-    nro_transferencia AS numero_documento,
-    fecha_confeccion AS fecha_creacion,
-    estado
+    'Transferencia' AS tipo_documento_pendiente,
+    transferencia.nro_transferencia AS numero_documento_pendiente,
+    transferencia.fecha_confeccion AS fecha_creacion_documento,
+    transferencia.estado AS estado_actual_documento
 FROM transferencia
-WHERE estado != 'Procesado';
+WHERE transferencia.estado != 'procesado';
