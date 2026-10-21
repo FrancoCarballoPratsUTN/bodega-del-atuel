@@ -1,30 +1,45 @@
--- Función: fn_total_comprobante
--- Propósito: Calcula el importe total de un comprobante sumando los 
---            subtotales de sus renglones y restando el descuento general.
+-- Función: fn_importes_comprobante
+-- Propósito: Obtiene los importes calculados de un comprobante (bruto, descuento, neto).
 -- Parámetros: p_nro_comprobante (INTEGER)
--- Volatilidad: STABLE (Lee datos de las tablas. El resultado es estable
---              durante la misma consulta, pero puede cambiar si la base se actualiza).
+-- Volatilidad: STABLE
+CREATE OR REPLACE FUNCTION fn_importes_comprobante(p_nro_comprobante INTEGER)
+RETURNS TABLE (subtotal_bruto NUMERIC, descuento_total NUMERIC, total_neto NUMERIC)
+LANGUAGE sql STABLE AS $$
+    SELECT COALESCE(SUM(r.cantidad * r.precio_unitario), 0),
+           COALESCE(SUM(r.descuento), 0),
+           COALESCE(SUM(r.subtotal), 0)
+      FROM renglon_comprobante r
+     WHERE r.nro_comprobante = p_nro_comprobante;
+$$;
 
+
+-- Función: fn_total_comprobante
+-- Propósito: Calcula el importe total (neto) de un comprobante sumando los 
+--            subtotales de sus renglones.
+-- Parámetros: p_nro_comprobante (INTEGER)
+-- Volatilidad: STABLE
 CREATE OR REPLACE FUNCTION fn_total_comprobante(p_nro_comprobante INTEGER) 
 RETURNS NUMERIC AS $$
-DECLARE
-    v_suma_renglones NUMERIC;
-    v_descuento_cabecera NUMERIC;
+DECLARE v_total NUMERIC;
 BEGIN
-
-    SELECT COALESCE(descuento, 0) INTO v_descuento_cabecera
-    FROM comprobante
-    WHERE nro_comprobante = p_nro_comprobante;
-
-
-    SELECT COALESCE(SUM(subtotal), 0) INTO v_suma_renglones
-    FROM renglon_comprobante
-    WHERE nro_comprobante = p_nro_comprobante;
-    
-
-    RETURN GREATEST(v_suma_renglones - v_descuento_cabecera, 0);
+    SELECT total_neto INTO v_total FROM fn_importes_comprobante(p_nro_comprobante);
+    RETURN COALESCE(v_total, 0);
 END;
 $$ LANGUAGE plpgsql STABLE;
+
+
+-- Función: fn_actualizar_importes_comprobante
+-- Propósito: Recalcula y actualiza subtotal/descuento/total del comprobante.
+CREATE OR REPLACE FUNCTION fn_actualizar_importes_comprobante(p_nro_comprobante INTEGER)
+RETURNS VOID LANGUAGE plpgsql AS $$
+BEGIN
+    UPDATE comprobante c
+       SET subtotal = i.subtotal_bruto,
+           descuento = i.descuento_total,
+           total    = i.total_neto
+      FROM fn_importes_comprobante(p_nro_comprobante) i
+     WHERE c.nro_comprobante = p_nro_comprobante;
+END $$;
 
 
 
@@ -50,21 +65,35 @@ $$ LANGUAGE plpgsql STABLE;
 
 
 
--- Función: fn_descuento_cliente
--- Propósito: Obtiene el porcentaje de descuento asignado a un cliente.
--- Parámetros: p_id_cliente (INTEGER)
--- Volatilidad: STABLE (Lee de la tabla cliente).
+-- Función: fn_descuento_por_tipo
+-- Propósito: Devuelve el porcentaje de descuento según el tipo de cliente (RN-06).
+-- Volatilidad: IMMUTABLE
+CREATE OR REPLACE FUNCTION fn_descuento_por_tipo(p_tipo_cliente TEXT)
+RETURNS NUMERIC
+LANGUAGE sql IMMUTABLE AS $$
+    SELECT CASE p_tipo_cliente
+        WHEN 'Socio' THEN 10.00
+        WHEN 'Distribuidor' THEN 20.00
+        WHEN 'Exportador' THEN 30.00
+        ELSE NULL
+    END;
+$$;
 
+
+-- Función: fn_descuento_cliente
+-- Propósito: Obtiene el porcentaje de descuento asignado a un cliente (RN-06).
+-- Parámetros: p_id_cliente (INTEGER)
+-- Volatilidad: STABLE
 CREATE OR REPLACE FUNCTION fn_descuento_cliente(p_id_cliente INTEGER) 
 RETURNS NUMERIC AS $$
 DECLARE
-    v_descuento NUMERIC;
+    v_tipo_cliente TEXT;
 BEGIN
-    SELECT descuento INTO v_descuento
+    SELECT tipo_cliente INTO v_tipo_cliente
     FROM cliente
     WHERE id_cliente = p_id_cliente;
     
-    RETURN COALESCE(v_descuento, 0);
+    RETURN COALESCE(fn_descuento_por_tipo(v_tipo_cliente), 0);
 END;
 $$ LANGUAGE plpgsql STABLE;
 

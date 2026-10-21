@@ -26,10 +26,46 @@ AFTER INSERT OR UPDATE OR DELETE ON composicion
 DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW EXECUTE FUNCTION trg_validar_composicion();
 
--- RN-08: El total del comprobante es la suma de sus renglones con descuento.
+
+-- RN-05: Todo vino debe tener al menos una fila de composicion que sume 100.
+CREATE OR REPLACE FUNCTION trg_validar_composicion_vino() RETURNS trigger
+LANGUAGE plpgsql AS $$
+DECLARE
+    v_suma NUMERIC;
+BEGIN
+    SELECT COALESCE(SUM(porcentaje), 0) INTO v_suma
+    FROM composicion
+    WHERE cod_vino = NEW.cod_vino;
+
+    IF v_suma != 100 THEN
+        RAISE EXCEPTION 'El vino % debe tener una composición que sume exactamente 100 (RN-05). Suma actual: %', NEW.cod_vino, v_suma;
+    END IF;
+    RETURN NULL;
+END;
+$$;
+
+CREATE CONSTRAINT TRIGGER trg_vino_composicion_obligatoria
+AFTER INSERT ON vino
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW EXECUTE FUNCTION trg_validar_composicion_vino();
+
+
+-- RN-08: El total del comprobante se calcula a partir de los renglones. No se carga a mano.
 CREATE OR REPLACE FUNCTION trg_calcular_subtotal_renglon() RETURNS trigger
 LANGUAGE plpgsql AS $$
+DECLARE
+    v_pct NUMERIC;
 BEGIN
+    IF NEW.descuento < 0 THEN
+        RAISE EXCEPTION 'El descuento del renglón no puede ser negativo (RN-15)' USING ERRCODE = '23514';
+    END IF;
+    -- RN-06: el descuento del renglón se deriva del tipo de cliente.
+    SELECT fn_descuento_cliente(c.id_cliente) INTO v_pct
+    FROM comprobante c
+    WHERE c.nro_comprobante = NEW.nro_comprobante;
+
+    v_pct := COALESCE(v_pct, 0);
+    NEW.descuento := ROUND((NEW.cantidad * NEW.precio_unitario) * v_pct / 100.0, 2);
     NEW.subtotal := fn_calcular_subtotal(NEW.cantidad, NEW.precio_unitario, NEW.descuento);
     RETURN NEW;
 END;
@@ -40,42 +76,53 @@ BEFORE INSERT OR UPDATE ON renglon_comprobante
 FOR EACH ROW EXECUTE FUNCTION trg_calcular_subtotal_renglon();
 
 
-CREATE OR REPLACE FUNCTION trg_validar_totales_comprobante() RETURNS trigger
+CREATE OR REPLACE FUNCTION trg_comprobante_calcula_importes() RETURNS trigger
 LANGUAGE plpgsql AS $$
-DECLARE
-    monto_total_esperado_comprobante NUMERIC;
 BEGIN
-    monto_total_esperado_comprobante := fn_total_comprobante(NEW.nro_comprobante);
-
-    IF NEW.total IS DISTINCT FROM monto_total_esperado_comprobante THEN
-        RAISE EXCEPTION 'El total del comprobante % no se carga a mano. Calculado: %, Ingresado: %',
-            NEW.nro_comprobante, monto_total_esperado_comprobante, NEW.total;
-    END IF;
-
+    NEW.subtotal := COALESCE((SELECT SUM(cantidad * precio_unitario) FROM renglon_comprobante WHERE nro_comprobante = NEW.nro_comprobante), 0);
+    NEW.descuento := COALESCE((SELECT SUM(descuento) FROM renglon_comprobante WHERE nro_comprobante = NEW.nro_comprobante), 0);
+    NEW.total     := COALESCE((SELECT SUM(subtotal) FROM renglon_comprobante WHERE nro_comprobante = NEW.nro_comprobante), 0);
     RETURN NEW;
 END;
 $$;
 
-CREATE TRIGGER trg_comprobante_valida_totales
+CREATE TRIGGER trg_comprobante_calcula_importes
 BEFORE INSERT OR UPDATE ON comprobante
-FOR EACH ROW EXECUTE FUNCTION trg_validar_totales_comprobante();
+FOR EACH ROW EXECUTE FUNCTION trg_comprobante_calcula_importes();
+
 
 -- RN-09: No se puede vender más de lo que hay en stock de la sala.
 CREATE OR REPLACE FUNCTION trg_validar_stock_venta() RETURNS trigger
 LANGUAGE plpgsql AS $$
 DECLARE
-    id_sala_origen INTEGER;
-    cantidad_stock_disponible_en_sala INTEGER;
+    v_id_sala INTEGER;
+    v_stock INTEGER;
+    v_disponible INTEGER;
 BEGIN
-    SELECT id_sala INTO id_sala_origen 
-    FROM comprobante 
+    SELECT id_sala INTO v_id_sala
+    FROM comprobante
     WHERE nro_comprobante = NEW.nro_comprobante;
 
-    cantidad_stock_disponible_en_sala := fn_stock_sala(id_sala_origen, NEW.cod_vino);
+    SELECT cantidad INTO v_stock
+    FROM stock_sala
+    WHERE id_sala = v_id_sala AND cod_vino = NEW.cod_vino
+    FOR UPDATE;
 
-    IF cantidad_stock_disponible_en_sala < NEW.cantidad THEN
-        RAISE EXCEPTION 'Stock insuficiente en la sala % para el vino %. Disponible: %, Solicitado: %',
-            id_sala_origen, NEW.cod_vino, cantidad_stock_disponible_en_sala, NEW.cantidad;
+    v_stock := COALESCE(v_stock, 0);
+
+    IF TG_OP = 'INSERT' THEN
+        IF v_stock < NEW.cantidad THEN
+            RAISE EXCEPTION 'Stock insuficiente en la sala % para el vino %. Disponible: %, Solicitado: %',
+                v_id_sala, NEW.cod_vino, v_stock, NEW.cantidad;
+        END IF;
+    ELSE
+        -- En UPDATE no se puede aumentar la cantidad si no hay stock suficiente
+        IF NEW.cantidad > OLD.cantidad THEN
+            IF v_stock < (NEW.cantidad - OLD.cantidad) THEN
+                RAISE EXCEPTION 'Stock insuficiente en la sala % para el vino %. Disponible: %, Solicitado: %',
+                    v_id_sala, NEW.cod_vino, v_stock, (NEW.cantidad - OLD.cantidad);
+            END IF;
+        END IF;
     END IF;
 
     RETURN NEW;
@@ -83,34 +130,54 @@ END;
 $$;
 
 CREATE TRIGGER trg_renglon_validar_stock
-BEFORE INSERT ON renglon_comprobante
+BEFORE INSERT OR UPDATE ON renglon_comprobante
 FOR EACH ROW EXECUTE FUNCTION trg_validar_stock_venta();
 
 
 CREATE OR REPLACE FUNCTION trg_actualizar_venta() RETURNS trigger
 LANGUAGE plpgsql AS $$
 DECLARE
-    id_sala_origen INTEGER;
+    v_id_sala INTEGER;
+    v_delta INTEGER;
+    v_vino INTEGER;
+    v_comp INTEGER;
 BEGIN
-    SELECT id_sala INTO id_sala_origen 
-    FROM comprobante 
-    WHERE nro_comprobante = NEW.nro_comprobante;
+    v_comp := COALESCE(NEW.nro_comprobante, OLD.nro_comprobante);
+    v_vino := COALESCE(NEW.cod_vino, OLD.cod_vino);
 
-    UPDATE stock_sala
-    SET cantidad = cantidad - NEW.cantidad
-    WHERE id_sala = id_sala_origen AND cod_vino = NEW.cod_vino;
+    SELECT id_sala INTO v_id_sala
+    FROM comprobante
+    WHERE nro_comprobante = v_comp;
 
-    UPDATE comprobante
-    SET total = fn_total_comprobante(NEW.nro_comprobante)
-    WHERE nro_comprobante = NEW.nro_comprobante;
+    IF TG_OP = 'INSERT' THEN
+        v_delta := -NEW.cantidad;
+    ELSIF TG_OP = 'UPDATE' THEN
+        v_delta := OLD.cantidad - NEW.cantidad;
+    ELSE
+        v_delta := OLD.cantidad;
+    END IF;
 
-    RETURN NEW;
+    IF v_delta <> 0 THEN
+        UPDATE stock_sala
+        SET cantidad = cantidad + v_delta
+        WHERE id_sala = v_id_sala AND cod_vino = v_vino;
+
+        IF NOT FOUND THEN
+            INSERT INTO stock_sala (id_sala, cod_vino, cantidad)
+            VALUES (v_id_sala, v_vino, v_delta);
+        END IF;
+    END IF;
+
+    PERFORM fn_actualizar_importes_comprobante(v_comp);
+
+    RETURN COALESCE(NEW, OLD);
 END;
 $$;
 
 CREATE TRIGGER trg_renglon_actualizar_venta
-AFTER INSERT ON renglon_comprobante
+AFTER INSERT OR UPDATE OR DELETE ON renglon_comprobante
 FOR EACH ROW EXECUTE FUNCTION trg_actualizar_venta();
+
 
 -- RN-10 y RN-11: Control de transiciones de estado y alta en "en_confeccion"
 CREATE OR REPLACE FUNCTION trg_documento_nace_en_confeccion() RETURNS trigger
@@ -136,11 +203,14 @@ CREATE OR REPLACE FUNCTION trg_control_estados() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
     IF OLD.estado = 'en_confeccion' AND NEW.estado NOT IN ('en_confeccion', 'terminado') THEN
-        RAISE EXCEPTION 'Transición inválida. De "en_confeccion" solo pasa a "terminado"';
+        RAISE EXCEPTION 'Transición inválida (RN-10/RN-11): de "en_confeccion" solo se pasa a "terminado"';
     ELSIF OLD.estado = 'terminado' AND NEW.estado NOT IN ('terminado', 'procesado') THEN
-        RAISE EXCEPTION 'Transición inválida. De "terminado" solo pasa a "procesado"';
+        RAISE EXCEPTION 'Transición inválida (RN-10/RN-11): de "terminado" solo se pasa a "procesado"';
     ELSIF OLD.estado = 'procesado' AND NEW.estado != 'procesado' THEN
-        RAISE EXCEPTION 'Un documento "procesado" no puede cambiar de estado';
+        RAISE EXCEPTION 'Transición inválida (RN-10/RN-11): un documento "procesado" no puede cambiar de estado';
+    ELSIF OLD.estado = 'terminado' AND NEW.estado = 'procesado'
+          AND current_setting('bda.procesar', true) IS DISTINCT FROM 'on' THEN
+        RAISE EXCEPTION 'El paso a "procesado" solo puede realizarse mediante sp_procesar_ingreso / sp_procesar_transferencia (RN-10/RN-11)';
     END IF;
     RETURN NEW;
 END;
@@ -181,8 +251,8 @@ LANGUAGE plpgsql AS $$
 DECLARE
     estado_actual_del_ingreso estado_enum;
 BEGIN
-    SELECT estado INTO estado_actual_del_ingreso 
-    FROM ingreso 
+    SELECT estado INTO estado_actual_del_ingreso
+    FROM ingreso
     WHERE cod_ingreso = COALESCE(NEW.cod_ingreso, OLD.cod_ingreso);
 
     IF estado_actual_del_ingreso != 'en_confeccion' THEN
@@ -202,8 +272,8 @@ LANGUAGE plpgsql AS $$
 DECLARE
     estado_actual_de_la_transferencia estado_enum;
 BEGIN
-    SELECT estado INTO estado_actual_de_la_transferencia 
-    FROM transferencia 
+    SELECT estado INTO estado_actual_de_la_transferencia
+    FROM transferencia
     WHERE nro_transferencia = COALESCE(NEW.nro_transferencia, OLD.nro_transferencia);
 
     IF estado_actual_de_la_transferencia != 'en_confeccion' THEN
@@ -216,6 +286,7 @@ $$;
 CREATE TRIGGER trg_renglon_transferencia_bloqueo
 BEFORE INSERT OR UPDATE OR DELETE ON renglon_transferencia
 FOR EACH ROW EXECUTE FUNCTION trg_bloqueo_renglones_transfer();
+
 
 -- RN-13: Auditoría de cambios de precio de vinos
 CREATE OR REPLACE FUNCTION trg_auditar_precio_vino() RETURNS trigger
