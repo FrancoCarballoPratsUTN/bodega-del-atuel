@@ -37,7 +37,7 @@ CREATE TABLE localidad (
     cp INTEGER,
     nombre VARCHAR(150) NOT NULL,
     id_provincia INTEGER NOT NULL,
-    cuit_encargado_regional cuit_dom,
+    cuit_encargado_regional cuit_dom NOT NULL,
     PRIMARY KEY (cp),
     CONSTRAINT fk_loc_provincia FOREIGN KEY (id_provincia) REFERENCES provincia(id_provincia) ON DELETE RESTRICT
 );
@@ -67,7 +67,7 @@ CREATE TABLE empleado (
 );
 
 ALTER TABLE localidad 
-    ADD CONSTRAINT fk_loc_empleado FOREIGN KEY (cuit_encargado_regional) REFERENCES empleado(cuit) ON DELETE RESTRICT ON UPDATE CASCADE;
+    ADD CONSTRAINT fk_loc_empleado FOREIGN KEY (cuit_encargado_regional) REFERENCES empleado(cuit) ON DELETE RESTRICT ON UPDATE CASCADE DEFERRABLE INITIALLY DEFERRED;
 
 CREATE TABLE transportista (
     cod_transportista SERIAL PRIMARY KEY,

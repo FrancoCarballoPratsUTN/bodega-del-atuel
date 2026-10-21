@@ -44,6 +44,8 @@ ALTER TABLE stock_deposito ADD CONSTRAINT chk_stock_deposito_positivo CHECK (can
 
 -- Cantidades de movimiento logístico o ventas siempre deben ser de al menos 1 botella.
 ALTER TABLE renglon_comprobante ADD CONSTRAINT chk_rcomp_cantidad CHECK (cantidad > 0);
+ALTER TABLE renglon_comprobante ADD CONSTRAINT chk_rcomp_precio CHECK (precio_unitario > 0);
+ALTER TABLE renglon_comprobante ADD CONSTRAINT chk_rcomp_descuento CHECK (descuento >= 0);
 
 ALTER TABLE renglon_ingreso ADD CONSTRAINT chk_ring_cantidad CHECK (cantidad > 0);
 
@@ -54,3 +56,14 @@ ALTER TABLE composicion ADD CONSTRAINT chk_composicion_porcentaje CHECK (porcent
 
 -- RN-07 (CHECK ENTRE COLUMNAS): El vencimiento debe ser posterior a la fecha de emisión.
 ALTER TABLE permiso_exportacion ADD CONSTRAINT chk_permiso_fechas CHECK (fecha_vencimiento > fecha_emision);
+
+-- RN-06: El descuento depende del tipo de cliente (Socio 10 %, Distribuidor 20 %, Exportador 30 %).
+ALTER TABLE cliente ADD CONSTRAINT chk_cliente_tipo CHECK (tipo_cliente IN ('Socio', 'Distribuidor', 'Exportador'));
+ALTER TABLE cliente ADD CONSTRAINT chk_cliente_descuento CHECK (
+    (tipo_cliente = 'Socio' AND descuento = 10.00) OR
+    (tipo_cliente = 'Distribuidor' AND descuento = 20.00) OR
+    (tipo_cliente = 'Exportador' AND descuento = 30.00)
+);
+
+-- RN-15: Los montos positivos.
+ALTER TABLE empleado ADD CONSTRAINT chk_emp_salario CHECK (salario > 0);
