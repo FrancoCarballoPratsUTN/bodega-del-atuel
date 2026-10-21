@@ -5,9 +5,9 @@ ALTER DOMAIN cuit_dom ADD CONSTRAINT chk_cuit_formato CHECK (VALUE ~ '^\d{11}$')
 --VALORES POR DEFECTO
 ALTER TABLE cliente ALTER COLUMN fecha_alta SET DEFAULT CURRENT_DATE;
 
-ALTER TABLE ingreso ALTER COLUMN estado SET DEFAULT 'En confección';
+ALTER TABLE ingreso ALTER COLUMN estado SET DEFAULT 'en_confeccion';
 
-ALTER TABLE transferencia ALTER COLUMN estado SET DEFAULT 'En confección';
+ALTER TABLE transferencia ALTER COLUMN estado SET DEFAULT 'en_confeccion';
 
 
 -- RESTRICCIONES DE UNICIDAD

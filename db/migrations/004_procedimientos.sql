@@ -35,7 +35,7 @@ BEGIN
     
 
     UPDATE transferencia 
-    SET estado = 'Procesado' 
+    SET estado = 'procesado' 
     WHERE nro_transferencia = p_nro_transferencia;
     
 END;
