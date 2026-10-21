@@ -7,9 +7,9 @@ CREATE DOMAIN cuit_dom AS VARCHAR(11);
 
 -- Tipo enumerado para el estado de los movimientos
 CREATE TYPE estado_enum AS ENUM (
-    'En confección',
-    'Terminado',
-    'Procesado'
+    'en_confeccion',
+    'terminado',
+    'procesado'
 );
 
 -- Tipo enumerado para los dias de la semana
