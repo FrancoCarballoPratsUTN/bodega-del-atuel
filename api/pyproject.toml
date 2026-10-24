@@ -1,0 +1,42 @@
+[project]
+name = "bodega-del-atuel-api"
+version = "0.1.0"
+description = "API REST para Bodegas del Atuel"
+requires-python = ">=3.14,<3.15"
+dependencies = [
+    "fastapi>=0.115,<1.0",
+    "psycopg[binary,pool]>=3.2,<4.0",
+    "pydantic-settings>=2.7,<3.0",
+    "uvicorn[standard]>=0.34,<1.0",
+]
+
+[build-system]
+requires = ["hatchling>=1.27,<2.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/bodega_api"]
+
+[dependency-groups]
+dev = [
+    "httpx2>=2.16.0",
+    "pytest>=8.3,<9.0",
+    "ruff>=0.9,<1.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+markers = [
+    "integration: pruebas contra una instancia PostgreSQL real",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.uv]
+default-groups = ["dev"]

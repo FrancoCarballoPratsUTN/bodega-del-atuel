@@ -17,7 +17,9 @@ $$ LANGUAGE plpgsql;
 
 INSERT INTO provincia (id_provincia, nombre) VALUES (1, 'Mendoza');
 INSERT INTO departamento (id_departamento, id_provincia, nombre) VALUES (1, 1, 'San Rafael');
-INSERT INTO localidad (cp, nombre, id_provincia) VALUES (5600, 'San Rafael Central', 1);
+-- El CUIT se completa después de crear el empleado; la FK es diferida.
+INSERT INTO localidad (cp, nombre, id_provincia, cuit_encargado_regional)
+VALUES (5600, 'San Rafael Central', 1, '20000000000');
 
 INSERT INTO sala_venta (id_sala, cp_localidad, calle, numero, dia_cierre) 
 VALUES (1, 5600, 'Av. Balloffet', 500, 'Domingo');
@@ -43,7 +45,7 @@ VALUES (1, 5600, 'Juan Gomez', 'DNI', '35123456', 'Mitre 120', '2023-05-10', 10.
 -- Caso OK: Inserción válida con precio > 0
 INSERT INTO vino (cod_vino, cuit_bodega, nombre, tipo, aniada, volumen, graduacion, precio) 
 VALUES (1, '30501234567', 'Atuel Reserva', 'Tinto', 2021, 750, 14.0, 4500.00);
-PERFORM registrar_test('RN-01', 'Inserción válida de vino con precio > 0', TRUE);
+SELECT registrar_test('RN-01', 'Inserción válida de vino con precio > 0', TRUE);
 -- Caso Fallo: Intentar insertar precio <= 0 (Error esperado: CHECK_VIOLATION '23514')
 DO $$
 BEGIN
@@ -56,6 +58,8 @@ END $$;
 
 -- RN-02: Una sala pertenece a una sola localidad; encargado único.
 -- Caso Fallo: Encargado regional inexistente (Error esperado: FOREIGN_KEY_VIOLATION '23503')
+-- La FK es diferida; se vuelve inmediata para poder verificar el rechazo.
+SET CONSTRAINTS fk_loc_empleado IMMEDIATE;
 DO $$
 BEGIN
     INSERT INTO localidad (cp, nombre, id_provincia, cuit_encargado_regional) 
@@ -64,6 +68,7 @@ BEGIN
 EXCEPTION WHEN SQLSTATE '23503' THEN
     PERFORM registrar_test('RN-02', 'Encargado inexistente rechazado (FK_VIOLATION)', TRUE);
 END $$;
+SET CONSTRAINTS fk_loc_empleado DEFERRED;
 
 -- RN-03: Cada empleado trabaja en una sola sala (FK NOT NULL).
 -- Caso Fallo: Crear empleado con id_sala NULL (Error esperado: NOT_NULL_VIOLATION '23502')
@@ -80,7 +85,7 @@ END $$;
 -- Caso OK: Primera cosecha registrada
 INSERT INTO lote_uva (nro_lote, id_finca, nro_parcela, cuit_bodega, campania, fecha, kg) 
 VALUES (1, 1, 1, '30501234567', 2024, '2024-03-15', 12000.00);
-PERFORM registrar_test('RN-04', 'Cosecha única registrada', TRUE);
+SELECT registrar_test('RN-04', 'Cosecha única registrada', TRUE);
 -- Caso Fallo: Duplicar cosecha en la misma campaña (Error esperado: UNIQUE_VIOLATION '23505')
 DO $$
 BEGIN
@@ -95,7 +100,7 @@ END $$;
 -- Caso OK: Composición válida de 60% y 40%
 INSERT INTO composicion (cod_vino, id_cepa, porcentaje) VALUES (1, 1, 60.00);
 INSERT INTO composicion (cod_vino, id_cepa, porcentaje) VALUES (1, 2, 40.00);
-PERFORM registrar_test('RN-05', 'Composición válida que suma 100%', TRUE);
+SELECT registrar_test('RN-05', 'Composición válida que suma 100%', TRUE);
 
 -- RN-06: Descuento obligatorio por Tipo de Cliente (Socio 10%, Distribuidor 20%, Exportador 30%).
 -- Caso Fallo: Intentar asignar 50% de descuento a un Socio (Error esperado: CHECK_VIOLATION '23514')
@@ -113,7 +118,7 @@ END $$;
 INSERT INTO exportador (id_cliente, pais_destino) VALUES (1, 'Brasil');
 INSERT INTO permiso_exportacion (cod_permiso, id_cliente, fecha_emision, fecha_vencimiento) 
 VALUES (1, 1, '2024-01-01', '2024-12-31');
-PERFORM registrar_test('RN-07', 'Permiso con fechas válidas registrado', TRUE);
+SELECT registrar_test('RN-07', 'Permiso con fechas válidas registrado', TRUE);
 -- Caso Fallo: Vencimiento anterior a la emisión (Error esperado: CHECK_VIOLATION '23514')
 DO $$
 BEGIN
@@ -129,13 +134,13 @@ INSERT INTO stock_sala (id_sala, cod_vino, cantidad) VALUES (1, 1, 100);
 -- Caso OK: Crear comprobante con subtotales iniciales calculados
 INSERT INTO comprobante (nro_comprobante, id_cliente, id_sala, fecha, subtotal, descuento, total) 
 VALUES (1, 1, 1, CURRENT_TIMESTAMP, 0, 0, 0);
-PERFORM registrar_test('RN-08', 'Comprobante creado con valores calculados', TRUE);
+SELECT registrar_test('RN-08', 'Comprobante creado con valores calculados', TRUE);
 
 -- RN-09: No vender más del stock disponible en la sala (Stock >= 0).
 -- Caso OK: Venta de 10 unidades sobre 100 disponibles
 INSERT INTO renglon_comprobante (nro_comprobante, cod_vino, cantidad, precio_unitario, descuento, subtotal) 
 VALUES (1, 1, 10, 4500.00, 0, 45000.00);
-PERFORM registrar_test('RN-09', 'Venta dentro del stock disponible aprobada', TRUE);
+SELECT registrar_test('RN-09', 'Venta dentro del stock disponible aprobada', TRUE);
 -- Caso Fallo: Venta de 500 unidades cuando restan 90 (Error esperado: RAISE_EXCEPTION 'P0001')
 DO $$
 BEGIN
@@ -156,7 +161,7 @@ UPDATE ingreso SET estado = 'terminado' WHERE cod_ingreso = 1;
 
 -- Invocar el procedimiento de procesamiento
 CALL sp_procesar_ingreso(1);
-PERFORM registrar_test('RN-10', 'Ingreso procesado e impactado en depósito', TRUE);
+SELECT registrar_test('RN-10', 'Ingreso procesado e impactado en depósito', TRUE);
 
 -- Caso Fallo: Intentar pasar de 'en_confeccion' a 'procesado' sin pasar por 'terminado' (Error esperado: 'P0001')
 INSERT INTO ingreso (cod_ingreso, cod_transportista, cuit_bodega, fecha, estado) 
@@ -174,7 +179,7 @@ END $$;
 -- Caso OK: Transferencia creada con fecha del día
 INSERT INTO transferencia (nro_transferencia, id_sala, fecha_confeccion, estado) 
 VALUES (1, 1, CURRENT_DATE, 'en_confeccion');
-PERFORM registrar_test('RN-11', 'Transferencia creada en confección', TRUE);
+SELECT registrar_test('RN-11', 'Transferencia creada en confección', TRUE);
 -- Caso Fallo: Intentar modificar fecha_confeccion (Error esperado: 'P0001')
 DO $$
 BEGIN
@@ -232,5 +237,13 @@ EXCEPTION WHEN SQLSTATE '23514' THEN
 END $$;
 
 SELECT regla, descripcion, resultado FROM resultado_test ORDER BY id;
+
+-- Falla explícitamente si alguna regla no se comportó como se esperaba.
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM resultado_test WHERE resultado = 'FAILED') THEN
+        RAISE EXCEPTION 'Hay pruebas de reglas de negocio fallidas';
+    END IF;
+END $$;
 
 ROLLBACK;
