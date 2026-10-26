@@ -12,6 +12,7 @@ from bodega_api.errors import (
     service_error_handler,
     validation_exception_handler,
 )
+from bodega_api.routers.catalogos import router as catalogos_router
 from bodega_api.routers.clientes import router as clientes_router
 from bodega_api.routers.comprobantes import router as comprobantes_router
 from bodega_api.routers.healthy import router as healthy_router
@@ -45,6 +46,7 @@ app.add_exception_handler(ValidationError, service_error_handler(422))
 app.add_exception_handler(ServiceUnavailableError, service_error_handler(503))
 
 app.include_router(healthy_router)
+app.include_router(catalogos_router)
 app.include_router(vinos_router)
 app.include_router(clientes_router)
 app.include_router(comprobantes_router)

@@ -69,8 +69,11 @@ def test_get_vino_detail_includes_composition_and_pairings(api_client):
     assert response.status_code == 200
     vino = response.json()
     assert vino["cod_vino"] == 1
+    assert vino["cuit_bodega"]
+    assert vino["cepas"][0]["id_cepa"] == 1
     assert vino["cepas"][0]["nombre"] == "Malbec"
     assert float(vino["cepas"][0]["porcentaje"]) == 100.0
+    assert vino["maridajes"][0]["id_maridaje"]
     assert vino["maridajes"][0]["nombre"] == "Carnes rojas"
 
 

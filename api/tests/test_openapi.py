@@ -9,6 +9,7 @@ def test_openapi_contains_all_delivered_routes():
 
     expected_paths = {
         "/healthy",
+        "/catalogos",
         "/vinos",
         "/vinos/{cod_vino}",
         "/clientes",

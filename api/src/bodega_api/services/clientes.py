@@ -6,9 +6,19 @@ from bodega_api.dao import clientes as clientes_dao
 from bodega_api.services.errors import NotFoundError
 
 
-def list_clientes(limit: int, offset: int) -> Sequence[dict[str, Any]]:
+def list_clientes(
+    limit: int,
+    offset: int,
+    busqueda: str | None = None,
+) -> Sequence[dict[str, Any]]:
+    normalized_search = busqueda.strip() if busqueda else None
     with db.connection() as connection:
-        return clientes_dao.list_clientes(connection, limit, offset)
+        return clientes_dao.list_clientes(
+            connection,
+            limit,
+            offset,
+            normalized_search or None,
+        )
 
 
 def get_cliente(id_cliente: int) -> dict[str, Any]:

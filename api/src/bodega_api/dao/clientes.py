@@ -9,8 +9,17 @@ def list_clientes(
     connection: Connection,
     limit: int,
     offset: int,
+    busqueda: str | None = None,
 ) -> Sequence[dict[str, Any]]:
-    query = """
+    filters = ["c.activo = TRUE"]
+    parameters: list[Any] = []
+
+    if busqueda:
+        filters.append("(c.nombre_razon_social ILIKE %s OR c.nro_doc ILIKE %s)")
+        pattern = f"%{busqueda}%"
+        parameters.extend([pattern, pattern])
+
+    query = f"""
         SELECT c.id_cliente, c.cp_localidad, c.nombre_razon_social, c.tipo_doc,
                c.nro_doc, c.direccion, c.fecha_alta, c.descuento,
                c.tipo_cliente, c.activo,
@@ -18,12 +27,13 @@ def list_clientes(
           FROM cliente c
           LEFT JOIN distribuidor d ON d.id_cliente = c.id_cliente
           LEFT JOIN exportador e ON e.id_cliente = c.id_cliente
-         WHERE c.activo = TRUE
+         WHERE {" AND ".join(filters)}
          ORDER BY c.id_cliente
          LIMIT %s OFFSET %s
     """
+    parameters.extend([limit, offset])
     with connection.cursor(row_factory=dict_row) as cursor:
-        cursor.execute(query, (limit, offset))
+        cursor.execute(query, parameters)
         return cursor.fetchall()
 
 

@@ -20,6 +20,33 @@ def _cliente_payload(**overrides):
     return payload
 
 
+def test_list_clientes_searches_by_name_or_document(api_client):
+    reference = api_client.get(
+        "/clientes",
+        params={"pagina": 1, "por_pagina": 1},
+    ).json()["items"][0]
+
+    by_name = api_client.get(
+        "/clientes",
+        params={"busqueda": reference["nombre_razon_social"], "por_pagina": 10},
+    )
+    by_document = api_client.get(
+        "/clientes",
+        params={"busqueda": reference["nro_doc"], "por_pagina": 10},
+    )
+
+    assert by_name.status_code == 200
+    assert by_document.status_code == 200
+    assert any(
+        item["id_cliente"] == reference["id_cliente"]
+        for item in by_name.json()["items"]
+    )
+    assert any(
+        item["id_cliente"] == reference["id_cliente"]
+        for item in by_document.json()["items"]
+    )
+
+
 def test_create_cliente_saves_distribuidor_subtype(api_client, db):
     created = api_client.post("/clientes", json=_cliente_payload())
     assert created.status_code == 201, created.text

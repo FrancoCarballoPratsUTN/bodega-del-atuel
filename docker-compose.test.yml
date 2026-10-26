@@ -1,0 +1,19 @@
+services:
+  front:
+    build:
+      context: ./front
+      dockerfile: Dockerfile.dev
+    environment:
+      PORT: 8443
+      API_PROXY_TARGET: http://api:8000
+    volumes:
+      - ./front:/app
+      - front_node_modules:/app/node_modules
+    ports:
+      - "${FRONT_PORT:-8443}:8443"
+    depends_on:
+      api:
+        condition: service_started
+
+volumes:
+  front_node_modules:

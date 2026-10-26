@@ -12,10 +12,12 @@ router = APIRouter(prefix="/clientes", tags=["Clientes"])
 def list_clientes_endpoint(
     pagina: int = Query(default=1, ge=1),
     por_pagina: int = Query(default=20, ge=1, le=100),
+    busqueda: str | None = Query(default=None, max_length=100),
 ) -> dict[str, Any]:
     items = cliente_service.list_clientes(
         limit=por_pagina,
         offset=(pagina - 1) * por_pagina,
+        busqueda=busqueda,
     )
     return {
         "items": items,

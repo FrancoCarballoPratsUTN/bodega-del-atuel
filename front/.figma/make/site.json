@@ -1,0 +1,10 @@
+{
+  "description": "Gestiona el catálogo, las ventas, el stock y las transferencias de vinos en distintas salas, con análisis para ayudar al personal y administradores de bodega a tomar decisiones.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
