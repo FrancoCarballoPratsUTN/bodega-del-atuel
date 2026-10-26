@@ -76,6 +76,28 @@ def test_list_clientes_returns_items(monkeypatch):
     assert response.json()["items"][0]["id_cliente"] == 1
 
 
+def test_list_clientes_forwards_search_term(monkeypatch):
+    captured: dict[str, object] = {}
+
+    def fake_list_clientes(limit, offset, busqueda=None):
+        captured.update(limit=limit, offset=offset, busqueda=busqueda)
+        return []
+
+    monkeypatch.setattr(
+        "bodega_api.services.clientes.list_clientes",
+        fake_list_clientes,
+    )
+
+    with TestClient(app) as client:
+        response = client.get(
+            "/clientes",
+            params={"busqueda": "Atuel", "pagina": 2, "por_pagina": 10},
+        )
+
+    assert response.status_code == 200
+    assert captured == {"limit": 10, "offset": 10, "busqueda": "Atuel"}
+
+
 def test_get_cliente_not_found(monkeypatch):
     def _raise(id_cliente):
         raise NotFoundError("Cliente no encontrado.")

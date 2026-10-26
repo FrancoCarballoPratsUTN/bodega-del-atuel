@@ -53,11 +53,12 @@ def list_vinos(
 
 def get_vino(connection: Connection, cod_vino: int) -> dict[str, Any] | None:
     query = """
-        SELECT v.cod_vino, v.nombre, v.tipo, v.aniada, v.volumen,
+        SELECT v.cod_vino, v.cuit_bodega, v.nombre, v.tipo, v.aniada, v.volumen,
                v.graduacion, v.precio, b.razon_social AS bodega,
                COALESCE(
                    json_agg(
                        DISTINCT jsonb_build_object(
+                           'id_cepa', ce.id_cepa,
                            'nombre', ce.nombre,
                            'tipo', ce.tipo,
                            'porcentaje', c.porcentaje
@@ -68,6 +69,7 @@ def get_vino(connection: Connection, cod_vino: int) -> dict[str, Any] | None:
                COALESCE(
                    json_agg(
                        DISTINCT jsonb_build_object(
+                           'id_maridaje', m.id_maridaje,
                            'nombre', m.nombre,
                            'temperatura_servicio', m.temp_servicio
                        )

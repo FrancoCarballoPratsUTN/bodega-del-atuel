@@ -28,15 +28,17 @@ api/
     ├── config.py              # Variables BDA_* y cadena de conexión
     ├── db.py                  # Pool psycopg y cierre en el lifespan
     ├── errors.py              # Traducción SQLSTATE -> HTTP
-    ├── main.py                # App, routers, handlers y /salud
+    ├── main.py                # App, routers, handlers y /healthy
     ├── schemas.py             # Contratos Pydantic de entrada
     ├── dao/
+    │   ├── catalogos.py
     │   ├── vinos.py
     │   ├── clientes.py
     │   ├── comprobantes.py
     │   ├── movimientos.py
     │   └── reportes.py
     └── routers/
+        ├── catalogos.py
         ├── vinos.py
         ├── clientes.py
         ├── comprobantes.py
@@ -90,8 +92,8 @@ Comprobaciones:
 
 ```bash
 uv run python --version          # Python 3.14.x
-curl http://localhost:8000/salud
-# {"estado":"ok","base_de_datos":"disponible"}
+curl http://localhost:8000/healthy
+# {"status":"ok","database":"available"}
 ```
 
 Documentación interactiva:
@@ -110,7 +112,7 @@ versión vigente de los triggers y la contraseña del rol API.
 cp .env.example .env
 docker compose up -d --build
 docker compose ps
-curl http://localhost:8000/salud
+curl http://localhost:8000/healthy
 ```
 
 Servicios y puertos por defecto:
@@ -136,7 +138,27 @@ Para detener sin borrar datos:
 docker compose down
 ```
 
-### 3.3. Variables de entorno
+### 3.3. Front temporal de pruebas
+
+El front se puede levantar junto con la base y la API usando el override de
+pruebas. Es una configuración temporal con Vite en modo desarrollo; el
+despliegue definitivo se resolverá más adelante.
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.test.yml up --build
+```
+
+| Servicio | Contenedor | Puerto host | Puerto interno |
+|---|---|---:|---:|
+| `front` | Node 22 + Vite | `8443` | `8443` |
+
+El front queda disponible en <http://localhost:8443>. Vite proxya `/api` hacia
+`http://api:8000` y elimina el prefijo `/api`, por lo que no se necesita CORS.
+El código fuente de `front/` se monta como bind mount y `node_modules` se
+conserva en un volumen nombrado (`front_node_modules`), de modo que los cambios
+del front se reflejan con HMR sin reconstruir la imagen.
+
+### 3.4. Variables de entorno
 
 La API lee variables con prefijo `BDA_`. Los valores de `.env.example` son
 locales de desarrollo.
@@ -156,14 +178,14 @@ parametrizar el contenedor de base y los puertos publicados.
 
 ## 4. Endpoints
 
-Total: 20 paths y 26 operaciones HTTP (sin contar `/docs`, `/redoc` y
+Total: 21 paths y 27 operaciones HTTP (sin contar `/docs`, `/redoc` y
 `/openapi.json`).
 
 ### 4.1. Salud
 
 | Método | Ruta | Descripción |
 |---|---|---|
-| `GET` | `/salud` | Verifica que el pool puede ejecutar `SELECT 1`. |
+| `GET` | `/healthy` | Verifica que el pool puede ejecutar `SELECT 1`. |
 
 Respuesta `200`:
 
@@ -173,7 +195,44 @@ Respuesta `200`:
 
 Si la base no responde, devuelve `503` con `{"error": "..."}`.
 
-### 4.2. Vinos
+### 4.2. Catálogos
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| `GET` | `/catalogos` | Salas, cepas y bodegas para selectores del front. |
+
+Respuesta `200`:
+
+```json
+{
+  "salas": [
+    {
+      "id_sala": 1,
+      "calle": "San Martín",
+      "numero": 100,
+      "cp_localidad": 5600,
+      "localidad": "San Rafael",
+      "dia_cierre": "lunes",
+      "activo": true
+    }
+  ],
+  "cepas": [
+    {"id_cepa": 1, "nombre": "Malbec", "tipo": "Tinta"}
+  ],
+  "bodegas": [
+    {
+      "cuit_bodega": "30050000001",
+      "razon_social": "Bodega Atuel",
+      "activo": true
+    }
+  ]
+}
+```
+
+El endpoint es de solo lectura y no reemplaza los listados paginados. El front
+lo usa para completar selectores sin hardcodear salas, cepas ni bodegas.
+
+### 4.3. Vinos
 
 | Método | Ruta | Descripción |
 |---|---|---|
@@ -245,7 +304,11 @@ La respuesta `201` incluye el `cod_vino` generado y el detalle completo. En
 se envían, reemplazan la composición o los maridajes actuales. La composición
 debe sumar exactamente 100 %, regla validada por PostgreSQL.
 
-### 4.3. Clientes
+El detalle de `GET /vinos/{cod_vino}` incluye `cuit_bodega`, `cepas[].id_cepa`
+y `maridajes[].id_maridaje` para que el front pueda precargar el formulario de
+edición sin inferir identidades por nombre.
+
+### 4.4. Clientes
 
 | Método | Ruta | Descripción |
 |---|---|---|
@@ -255,9 +318,11 @@ debe sumar exactamente 100 %, regla validada por PostgreSQL.
 | `PUT` | `/clientes/{id_cliente}` | Modificación, incluso cambio de subtipo. |
 | `DELETE` | `/clientes/{id_cliente}` | Baja lógica. |
 
-`GET /clientes` acepta `pagina` y `por_pagina` (máximo 100). El detalle agrega
-`zona_cobertura` y `nro_habilitacion` para distribuidores, o `pais_destino`
-para exportadores.
+`GET /clientes` acepta `pagina`, `por_pagina` (máximo 100) y `busqueda`
+opcional. La búsqueda compara el texto contra `nombre_razon_social` y
+`nro_doc`; el front la usa porque la base contiene 20.000 clientes. El detalle
+agrega `zona_cobertura` y `nro_habilitacion` para distribuidores, o
+`pais_destino` para exportadores.
 
 Ejemplo de alta de distribuidor:
 
@@ -284,7 +349,7 @@ Reglas de subtipo:
 - Al cambiar de tipo, el DAO elimina la fila del subtipo anterior y crea la
   nueva, dentro de la misma transacción.
 
-### 4.4. Comprobantes
+### 4.5. Comprobantes
 
 | Método | Ruta | Descripción |
 |---|---|---|
@@ -332,7 +397,7 @@ respuesta `201` se obtiene releyendo el comprobante dentro de la transacción:
 Si un vino no existe o no hay stock suficiente, la transacción se revierte por
 completo: no quedan cabecera ni renglones parciales.
 
-### 4.5. Transferencias
+### 4.6. Transferencias
 
 | Método | Ruta | Descripción |
 |---|---|---|
@@ -358,7 +423,7 @@ Los triggers impiden agregar renglones fuera de `en_confeccion`; el
 procedimiento valida el estado y el stock. Una transición inválida devuelve
 `409` con el mensaje de la regla.
 
-### 4.6. Ingresos
+### 4.7. Ingresos
 
 | Método | Ruta | Descripción |
 |---|---|---|
@@ -382,7 +447,7 @@ Renglón:
 El procedimiento `sp_procesar_ingreso` incrementa el stock de depósito y deja
 la auditoría correspondiente. La API no modifica stock directamente.
 
-### 4.7. Reportes
+### 4.8. Reportes
 
 | Método | Ruta | Consigna | Respuesta |
 |---|---|---|---|
@@ -538,17 +603,18 @@ transacción y la carga original no se altera.
 
 | Área | Casos |
 |---|---:|
-| Vinos: listado, filtros, detalle, CRUD, composición, duplicados | 7 |
-| Clientes: subtipos, cambio de tipo, descuento, duplicados, baja lógica | 5 |
-| Comprobantes: totales, stock, rollback sin stock | 2 |
-| Movimientos: circuitos de transferencia e ingreso, estado inválido | 3 |
-| Reportes S5-S9, inyección SQL y análisis estático del DAO | 7 |
-| Unitarios: salud, errores, validación, OpenAPI y routers con dobles | 20 |
+| Catálogos: salas, cepas y bodegas | 2 |
+| Vinos: listado, filtros, detalle, CRUD, composición, duplicados | 12 |
+| Clientes: búsqueda, subtipos, cambio de tipo, descuento, duplicados, baja lógica | 12 |
+| Comprobantes: totales, stock, rollback sin stock | 6 |
+| Movimientos: circuitos de transferencia e ingreso, estado inválido | 13 |
+| Reportes S5-S9, inyección SQL y análisis estático del DAO | 13 |
+| Transversales: salud, errores, validación, OpenAPI y rutas | 23 |
 
 Resultado verificado:
 
 ```text
-44 passed in ~1.0s
+81 passed (55 unitarios + 26 de integración) in ~2.6s
 ```
 
 La suite no emite warnings. Ruff finaliza con `All checks passed!`.
@@ -573,8 +639,8 @@ FastAPI genera el contrato automáticamente desde los routers, los parámetros
 - `/openapi.json`: especificación OpenAPI 3.
 
 La prueba `test_openapi_contains_all_delivered_routes` verifica que estén los
-20 paths entregados, agrupados por tags `Salud`, `Vinos`, `Clientes`,
-`Comprobantes`, `Transferencias`, `Ingresos` y `Reportes`.
+21 paths entregados, agrupados por tags `Healthy`, `Catálogos`, `Vinos`,
+`Clientes`, `Comprobantes`, `Transferencias`, `Ingresos` y `Reportes`.
 
 Los cuerpos de entrada tienen modelos Pydantic con restricciones (`gt`, `ge`,
 `le`, `min_length`, `pattern`, `Literal`). Las respuestas se documentan con
@@ -601,14 +667,15 @@ real deben agregarse antes de exponer la API fuera de la red local.
 - No hay endpoint de listado de comprobantes; solo alta y consulta por número.
 - No se permite modificar ni borrar comprobantes emitidos, coherencia con el
   circuito comercial.
-- Los clientes solo se paginan; no tienen filtros por nombre, tipo o localidad.
+- Los clientes se paginan y permiten búsqueda por nombre o documento; no hay
+  filtros por tipo, localidad ni otros campos.
 - Los reportes no se paginan. Sus resultados son acotados por las consignas
   (`TOP 10`, `LIMIT 1`) salvo `vinos-sin-stock`, que puede crecer con el
   catálogo.
 - La baja lógica no tiene endpoint de reactivación.
 - No hay claves de idempotencia para reintentos de escritura.
-- Los `Decimal` se serializan como string para preservar precisión; los
-  clientes deben convertirlos antes de operar.
+- Los campos monetarios y porcentajes pueden llegar como número o string según
+  el encoder de FastAPI; el front tolera ambos y solo los formatea.
 - Las fechas y timestamps se devuelven tal como los entrega PostgreSQL, sin
   normalización de zona horaria.
 - El pool es global por proceso; un despliegue con varios workers crea un pool
@@ -620,9 +687,9 @@ real deben agregarse antes de exponer la API fuera de la red local.
 |---|---|---|
 | Dependencias y Python | `cd api && uv sync` | OK, Python 3.14 |
 | Lint | `uv run ruff check src tests` | `All checks passed!` |
-| Pruebas | `uv run pytest -q` | `44 passed` |
-| OpenAPI | `curl localhost:8000/openapi.json` | 20 paths / 26 operaciones |
-| Salud | `curl localhost:8000/salud` | `200` |
+| Pruebas unitarias | `uv run pytest -q -m "not integration"` | `55 passed, 26 deselected` |
+| OpenAPI | `curl localhost:8000/openapi.json` | 21 paths / 27 operaciones |
+| Salud | `curl localhost:8000/healthy` | `200` |
 | Swagger | `curl localhost:8000/docs` | `200` |
 | Compose | `docker compose up -d --build` | DB healthy + API arriba |
 | Rol de conexión | `\du` / `007_roles.sql` | `rol_api_lectura_escritura` |
