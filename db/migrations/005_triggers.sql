@@ -179,7 +179,7 @@ AFTER INSERT OR UPDATE OR DELETE ON renglon_comprobante
 FOR EACH ROW EXECUTE FUNCTION trg_actualizar_venta();
 
 
--- RN-10 y RN-11: Control de transiciones de estado y alta en "en_confeccion"
+-- RN-10 y RN-11: Control de transiciones de estado and alta in "en_confeccion"
 CREATE OR REPLACE FUNCTION trg_documento_nace_en_confeccion() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
@@ -225,7 +225,7 @@ BEFORE UPDATE ON transferencia
 FOR EACH ROW EXECUTE FUNCTION trg_control_estados();
 
 
--- RN-11: Fecha de confección actual e inmodificable para transferencias
+-- RN-11: Fecha de confección actual e inmodificable for transferencias
 CREATE OR REPLACE FUNCTION trg_fecha_transferencia() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
@@ -233,7 +233,7 @@ BEGIN
         NEW.fecha_confeccion := CURRENT_DATE;
     ELSIF TG_OP = 'UPDATE' THEN
         IF NEW.fecha_confeccion IS DISTINCT FROM OLD.fecha_confeccion THEN
-            RAISE EXCEPTION 'La fecha de confección no se puede modificar.';
+            RAISE EXCEPTION 'La fecha de confección no se puede modify.';
         END IF;
     END IF;
     RETURN NEW;
@@ -245,7 +245,7 @@ BEFORE INSERT OR UPDATE ON transferencia
 FOR EACH ROW EXECUTE FUNCTION trg_fecha_transferencia();
 
 
--- RN-12: Un documento que no está en confección no admite modificaciones
+-- RN-12: Un documento
 CREATE OR REPLACE FUNCTION trg_bloqueo_renglones_ingreso() RETURNS trigger
 LANGUAGE plpgsql AS $$
 DECLARE
@@ -262,10 +262,10 @@ BEGIN
     IF TG_OP = 'DELETE' THEN
         IF NOT borrado_historico_permitido
            AND estado_actual_del_ingreso IS DISTINCT FROM 'en_confeccion' THEN
-            RAISE EXCEPTION 'Solo se permiten cambios en renglones cuando el ingreso está en "en_confeccion"';
+            RAISE EXCEPTION 'Solo se permiten cambios en renglones cuando el ingreso está in "en_confeccion"';
         END IF;
     ELSIF estado_actual_del_ingreso IS DISTINCT FROM 'en_confeccion' THEN
-        RAISE EXCEPTION 'Solo se permiten cambios en renglones cuando el ingreso está en "en_confeccion"';
+        RAISE EXCEPTION 'Solo se permiten cambios en renglones cuando el ingreso está in "en_confeccion"';
     END IF;
     RETURN COALESCE(NEW, OLD);
 END;
@@ -285,7 +285,7 @@ BEGIN
     WHERE nro_transferencia = COALESCE(NEW.nro_transferencia, OLD.nro_transferencia);
 
     IF estado_actual_de_la_transferencia != 'en_confeccion' THEN
-        RAISE EXCEPTION 'Solo se permiten cambios en renglones cuando la transferencia está en "en_confeccion"';
+        RAISE EXCEPTION 'Solo se permiten changes in renglones when la transferencia está in "en_confeccion"';
     END IF;
     RETURN COALESCE(NEW, OLD);
 END;
@@ -311,3 +311,95 @@ $$;
 CREATE TRIGGER trg_vino_auditoria
 AFTER UPDATE ON vino
 FOR EACH ROW EXECUTE FUNCTION trg_auditar_precio_vino();
+
+
+-- Herencia disjunta cliente/distribuidor/exportador
+CREATE OR REPLACE FUNCTION fn_check_distribuidor_consistente()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM cliente
+        WHERE id_cliente = NEW.id_cliente
+          AND tipo_cliente = 'Distribuidor'
+          AND activo = TRUE
+    ) THEN
+        RAISE EXCEPTION 'El cliente % debe tener tipo_cliente = ''Distribuidor'' para existir en distribuidor', NEW.id_cliente;
+    END IF;
+
+    IF EXISTS (
+        SELECT 1 FROM exportador
+        WHERE id_cliente = NEW.id_cliente
+    ) THEN
+        RAISE EXCEPTION 'El cliente % no puede ser Distribuidor y Exportador simultáneamente', NEW.id_cliente;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_distribuidor_consistente
+BEFORE INSERT OR UPDATE ON distribuidor
+FOR EACH ROW EXECUTE FUNCTION fn_check_distribuidor_consistente();
+
+
+CREATE OR REPLACE FUNCTION fn_check_exportador_consistente()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM cliente
+        WHERE id_cliente = NEW.id_cliente
+          AND tipo_cliente = 'Exportador'
+          AND activo = TRUE
+    ) THEN
+        RAISE EXCEPTION 'El cliente % debe tener tipo_cliente = ''Exportador'' para existir en exportador', NEW.id_cliente;
+    END IF;
+
+    IF EXISTS (
+        SELECT 1 FROM distribuidor
+        WHERE id_cliente = NEW.id_cliente
+    ) THEN
+        RAISE EXCEPTION 'El cliente % no puede ser Distribuidor y Exportador simultáneamente', NEW.id_cliente;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_exportador_consistente
+BEFORE INSERT OR UPDATE ON exportador
+FOR EACH ROW EXECUTE FUNCTION fn_check_exportador_consistente();
+
+
+CREATE OR REPLACE FUNCTION fn_check_cliente_tipo_consistente()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.tipo_cliente = 'Socio' THEN
+        IF EXISTS (SELECT 1 FROM distribuidor WHERE id_cliente = NEW.id_cliente) THEN
+            RAISE EXCEPTION 'No se puede pasar el cliente % a Socio: existe registro en distribuidor', NEW.id_cliente;
+        END IF;
+        IF EXISTS (SELECT 1 FROM exportador WHERE id_cliente = NEW.id_cliente) THEN
+            RAISE EXCEPTION 'No se puede pasar el cliente % a Socio: existe registro en exportador', NEW.id_cliente;
+        END IF;
+    END IF;
+
+    IF NEW.tipo_cliente = 'Distribuidor' THEN
+        IF EXISTS (SELECT 1 FROM exportador WHERE id_cliente = NEW.id_cliente) THEN
+            RAISE EXCEPTION 'No se puede pasar el cliente % a Distribuidor: existe registro en exportador', NEW.id_cliente;
+        END IF;
+    END IF;
+
+    IF NEW.tipo_cliente = 'Exportador' THEN
+        IF EXISTS (SELECT 1 FROM distribuidor WHERE id_cliente = NEW.id_cliente) THEN
+            RAISE EXCEPTION 'No se puede pasar el cliente % a Exportador: existe registro en distribuidor', NEW.id_cliente;
+        END IF;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_cliente_tipo_consistente
+BEFORE UPDATE OF tipo_cliente ON cliente
+FOR EACH ROW
+WHEN (OLD.tipo_cliente IS DISTINCT FROM NEW.tipo_cliente)
+EXECUTE FUNCTION fn_check_cliente_tipo_consistente();
