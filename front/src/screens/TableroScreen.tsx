@@ -17,7 +17,7 @@ import {
   formatMoney,
   formatNumber,
   salaLabel,
-} from "../lib/display";
+} from "../display";
 import type { Sala, VentaSala } from "../types";
 import {
   EmptyState,
@@ -66,7 +66,7 @@ export function TableroScreen() {
     <div>
       <PageHeader
         title="Tablero"
-        subtitle="Ranking de vinos vendidos, ventas por sala del último trimestre y vinos sin stock. Todos los valores provienen de los reportes de la API."
+        subtitle="Consultá los vinos más vendidos, las ventas por sala y los vinos sin stock."
       />
 
       <section className={`${cardClass} overflow-hidden`}>
@@ -75,7 +75,7 @@ export function TableroScreen() {
             Top 10 de vinos
           </h2>
           <p className="mt-1 text-sm text-wine-900/50">
-            Orden y cantidades calculados por la base de datos.
+            Ordenado por cantidad de botellas vendidas.
           </p>
         </div>
         {topVinos.error ? (
@@ -134,7 +134,7 @@ export function TableroScreen() {
             Ventas por sala
           </h2>
           <p className="mt-1 text-sm text-wine-900/50">
-            Importes del último trimestre, sin filtros ni cálculos en el front.
+            Importes de los últimos tres meses.
           </p>
         </div>
         <div className="mt-5">
@@ -161,7 +161,7 @@ export function TableroScreen() {
               Vinos sin stock en la sala
             </h2>
             <p className="mt-1 text-sm text-wine-900/50">
-              Lista informada por la API para la sala seleccionada.
+              Vinos sin unidades disponibles en la sala seleccionada.
             </p>
           </div>
           <FormField
@@ -192,7 +192,7 @@ export function TableroScreen() {
           {sinStock.error ? (
             <ErrorBanner
               error={sinStock.error}
-              title="No se pudo cargar el reporte de stock"
+              title="No se pudo cargar la lista de stock"
               onRetry={sinStock.reload}
             />
           ) : !sinStock.data ? (
@@ -200,7 +200,7 @@ export function TableroScreen() {
           ) : sinStock.data.length === 0 ? (
             <EmptyState
               title="No hay vinos sin stock en esta sala"
-              description="El reporte no devolvió filas para la sala seleccionada."
+              description="No hay vinos sin stock para la sala seleccionada."
             />
           ) : (
             <div className="overflow-hidden rounded-xl border border-[#E7DADD]">

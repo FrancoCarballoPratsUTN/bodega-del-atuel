@@ -49,6 +49,56 @@ export function toApiError(error: unknown): ApiError {
   return new ApiError("Error desconocido al comunicarse con la API.", 0);
 }
 
+export function humanizeApiError(error: ApiError | string): string {
+  if (typeof error === "string") return error;
+
+  const backendMessage = error.message.trim();
+  const normalized = backendMessage.toLowerCase();
+
+  if (error.status === 0) {
+    return "No pudimos conectar con el servidor. Revisá tu conexión e intentá de nuevo.";
+  }
+
+  switch (error.codigoSqlstate) {
+    case "23505":
+      return "Ya existe un registro con esos datos. Revisá si ya fue cargado.";
+    case "23503":
+      return "No se puede completar la operación porque faltan datos relacionados o están en uso.";
+    case "23514":
+      return "Alguno de los datos no cumple las reglas permitidas. Revisalo e intentá de nuevo.";
+    case "23502":
+      return "Faltan completar datos obligatorios.";
+    case "22P02":
+      return "Hay un dato con un formato inválido. Revisalo e intentá de nuevo.";
+  }
+
+  if (normalized.includes("duplicate key") || normalized.includes("unique constraint")) {
+    return "Ya existe un registro con esos datos. Revisá si ya fue cargado.";
+  }
+  if (normalized.includes("stock insuficiente")) return backendMessage;
+  if (normalized.includes("composición") && normalized.includes("sumar")) {
+    return "La composición de cepas debe sumar exactamente 100%.";
+  }
+  if (normalized.includes("transición inválida")) {
+    return "No se puede avanzar la transferencia desde su estado actual.";
+  }
+  if (normalized.includes("en_confeccion") && normalized.includes("renglones")) {
+    return "Solo se pueden modificar los productos mientras la transferencia está en confección.";
+  }
+
+  if (error.status === 409) {
+    return "No se pudo completar porque los datos entran en conflicto con un registro existente.";
+  }
+  if (error.status === 422 || error.status === 400) {
+    return backendMessage || "Revisá los datos ingresados e intentá de nuevo.";
+  }
+  if (error.status >= 500) {
+    return "Ocurrió un problema en el servidor. Intentá de nuevo en unos minutos.";
+  }
+
+  return backendMessage || "No se pudo completar la operación. Intentá de nuevo.";
+}
+
 type QueryValue = string | number | undefined | null;
 
 function withQuery(path: string, values: Record<string, QueryValue>): string {

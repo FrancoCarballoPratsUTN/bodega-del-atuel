@@ -10,7 +10,7 @@ import {
   formatPercent,
   salaLabel,
   tipoLabel,
-} from "../lib/display";
+} from "../display";
 import type { Cliente, Comprobante, VinoResumen } from "../types";
 import {
   EmptyState,
@@ -127,7 +127,7 @@ export function VentaScreen() {
     <div>
       <PageHeader
         title="Nueva venta"
-        subtitle="Seleccioná el cliente y la sala, agregá vinos y generá el comprobante. Los importes y el stock son validados por PostgreSQL."
+        subtitle="Elegí el cliente y la sala, agregá vinos y confirmá la venta."
       />
 
       {error ? (
@@ -149,7 +149,6 @@ export function VentaScreen() {
             <FormField
               label="Sala de venta"
               htmlFor="venta-sala"
-              hint="Las salas se cargan desde la API."
             >
               <select
                 id="venta-sala"
@@ -181,9 +180,6 @@ export function VentaScreen() {
                 <h2 className="text-sm font-bold uppercase tracking-wide text-wine-800/60">
                   Vinos de la venta
                 </h2>
-                <p className="mt-1 text-sm text-wine-900/50">
-                  El front no calcula subtotales ni totales.
-                </p>
               </div>
               <button
                 type="button"
@@ -280,7 +276,7 @@ export function VentaScreen() {
 
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#E7DADD] px-5 py-4">
               <p className="text-xs text-wine-900/45">
-                El total se conoce recién con la respuesta de la API.
+                El total se muestra al generar el comprobante.
               </p>
               <button
                 type="button"
@@ -312,7 +308,7 @@ export function VentaScreen() {
                   Comprobante
                 </h2>
                 <p className="mt-1 text-sm text-wine-900/50">
-                  Importes calculados por la base.
+                  El total aparecerá al generar el comprobante.
                 </p>
               </div>
               {comprobante ? (
@@ -332,8 +328,8 @@ export function VentaScreen() {
                   Todavía no se generó el comprobante.
                 </p>
                 <p className="mt-1 text-sm leading-6 text-wine-900/55">
-                  Al confirmar la venta, la API devuelve el subtotal, el
-                  descuento y el total calculados por PostgreSQL.
+                  Al confirmar la venta, vas a ver el subtotal, el descuento y
+                  el total del comprobante.
                 </p>
                 {cliente ? (
                   <p className="mt-3 text-xs text-wine-900/45">

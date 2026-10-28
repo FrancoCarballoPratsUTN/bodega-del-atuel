@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import { searchClientes, toApiError, type ApiError } from "../api";
 import type { Cliente } from "../types";
-import { formatPercent } from "../lib/display";
+import { formatPercent } from "../display";
 import { ErrorBanner, ghostButtonClass, inputClass, labelClass } from "./ui";
 import { SearchIcon } from "./Icons";
 
@@ -105,7 +105,7 @@ export function ClientSearch({ selected, onSelect }: ClientSearchProps) {
         ) : null}
       </div>
       <p className="mt-1.5 text-xs text-wine-900/45">
-        Ingresá al menos dos caracteres. Los resultados provienen de la API.
+        Ingresá al menos dos caracteres para buscar.
       </p>
 
       {error ? (

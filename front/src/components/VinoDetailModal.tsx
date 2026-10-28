@@ -8,7 +8,7 @@ import {
   formatPercent,
   tipoBadgeClass,
   tipoLabel,
-} from "../lib/display";
+} from "../display";
 import {
   Badge,
   ErrorBanner,
@@ -41,7 +41,7 @@ export function VinoDetailModal({
       subtitle={
         resource.data
           ? `Código #${resource.data.cod_vino} · ${resource.data.bodega}`
-          : "Información obtenida de la API."
+          : "Detalle del vino"
       }
       onClose={onClose}
     >

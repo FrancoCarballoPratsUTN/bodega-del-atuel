@@ -7,7 +7,7 @@ import {
   formatMoney,
   tipoBadgeClass,
   tipoLabel,
-} from "../lib/display";
+} from "../display";
 import type { VinoResumen } from "../types";
 import { PAGE_SIZE } from "../types";
 import {
@@ -96,7 +96,7 @@ export function WinePickerDialog({
   return (
     <Modal
       title={title}
-      subtitle="Filtros y precios provienen de la API."
+      subtitle="Buscá vinos y elegí la cantidad que querés agregar."
       onClose={onClose}
       widthClass="max-w-5xl"
     >
@@ -112,7 +112,6 @@ export function WinePickerDialog({
           label="Cantidad para el renglón"
           htmlFor="picker-cantidad"
           className="w-40"
-          hint="Se envía a la API al agregar."
         >
           <input
             id="picker-cantidad"
