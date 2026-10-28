@@ -1,6 +1,6 @@
-FROM ghcr.io/astral-sh/uv:0.11.14 AS uv
+FROM ghcr.io/astral-sh/uv:0.11.15 AS uv
 
-FROM python:3.14-slim
+FROM python:3.15.1-slim
 
 COPY --from=uv /uv /uvx /usr/local/bin/
 
@@ -14,7 +14,7 @@ WORKDIR /app
 
 COPY pyproject.toml uv.lock ./
 COPY src ./src
-RUN uv sync --frozen --no-dev
+RUN uv sync --no-dev
 
 ENV PATH="/app/.venv/bin:$PATH"
 
