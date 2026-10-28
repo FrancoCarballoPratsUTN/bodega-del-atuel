@@ -7,7 +7,7 @@ from bodega_api.services import healthy as healthy_service
 router = APIRouter(tags=["Healthy"])
 
 
-@router.get("/healthy")
+@router.get("/health")
 def healthy_check() -> dict[str, str]:
     healthy_service.check_database()
     return {

@@ -28,7 +28,7 @@ api/
     ├── config.py              # Variables BDA_* y cadena de conexión
     ├── db.py                  # Pool psycopg y cierre en el lifespan
     ├── errors.py              # Traducción SQLSTATE -> HTTP
-    ├── main.py                # App, routers, handlers y /healthy
+    ├── main.py                # App, routers, handlers y /health
     ├── schemas.py             # Contratos Pydantic de entrada
     ├── dao/
     │   ├── catalogos.py
@@ -92,7 +92,7 @@ Comprobaciones:
 
 ```bash
 uv run python --version          # Python 3.14.x
-curl http://localhost:8000/healthy
+curl http://localhost:8000/health
 # {"status":"ok","database":"available"}
 ```
 
@@ -112,7 +112,7 @@ versión vigente de los triggers y la contraseña del rol API.
 cp .env.example .env
 docker compose up -d --build
 docker compose ps
-curl http://localhost:8000/healthy
+curl http://localhost:8000/health
 ```
 
 Servicios y puertos por defecto:
@@ -185,7 +185,7 @@ Total: 21 paths y 27 operaciones HTTP (sin contar `/docs`, `/redoc` y
 
 | Método | Ruta | Descripción |
 |---|---|---|
-| `GET` | `/healthy` | Verifica que el pool puede ejecutar `SELECT 1`. |
+| `GET` | `/health` | Verifica que el pool puede ejecutar `SELECT 1`. |
 
 Respuesta `200`:
 
@@ -689,7 +689,7 @@ real deben agregarse antes de exponer la API fuera de la red local.
 | Lint | `uv run ruff check src tests` | `All checks passed!` |
 | Pruebas unitarias | `uv run pytest -q -m "not integration"` | `55 passed, 26 deselected` |
 | OpenAPI | `curl localhost:8000/openapi.json` | 21 paths / 27 operaciones |
-| Salud | `curl localhost:8000/healthy` | `200` |
+| Salud | `curl localhost:8000/health` | `200` |
 | Swagger | `curl localhost:8000/docs` | `200` |
 | Compose | `docker compose up -d --build` | DB healthy + API arriba |
 | Rol de conexión | `\du` / `007_roles.sql` | `rol_api_lectura_escritura` |

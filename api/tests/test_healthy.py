@@ -25,7 +25,7 @@ def test_healthy_reports_database_status(monkeypatch):
     monkeypatch.setattr("bodega_api.db._pool", HealthyPool())
 
     with TestClient(app) as client:
-        response = client.get("/healthy")
+        response = client.get("/health")
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok", "database": "available"}
@@ -42,7 +42,7 @@ def test_healthy_reports_database_unavailable(monkeypatch):
     monkeypatch.setattr("bodega_api.db._pool", FailingPool())
 
     with TestClient(app) as client:
-        response = client.get("/healthy")
+        response = client.get("/health")
 
     assert response.status_code == 503
     assert response.json() == {"error": "La base de datos no está disponible."}

@@ -8,7 +8,7 @@ def test_openapi_contains_all_delivered_routes():
         schema = client.get("/openapi.json").json()
 
     expected_paths = {
-        "/healthy",
+        "/health",
         "/catalogos",
         "/vinos",
         "/vinos/{cod_vino}",
