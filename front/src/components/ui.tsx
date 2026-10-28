@@ -1,6 +1,6 @@
 import { useEffect, type ReactNode } from "react";
 
-import type { ApiError } from "../api";
+import { humanizeApiError, type ApiError } from "../api";
 import {
   AlertIcon,
   ChevronLeftIcon,
@@ -37,9 +37,7 @@ interface ErrorBannerProps {
 export function ErrorBanner({ error, title, onRetry }: ErrorBannerProps) {
   if (!error) return null;
 
-  const message = typeof error === "string" ? error : error.message;
-  const sqlstate = typeof error === "string" ? undefined : error.codigoSqlstate;
-  const detalles = typeof error === "string" ? undefined : error.detalles;
+  const message = humanizeApiError(error);
 
   return (
     <div
@@ -49,18 +47,8 @@ export function ErrorBanner({ error, title, onRetry }: ErrorBannerProps) {
       <div className="flex gap-3">
         <AlertIcon className="mt-0.5 h-5 w-5 shrink-0 text-rose-700" />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold">{title ?? "Error de la API"}</p>
+          <p className="text-sm font-bold">{title ?? "Ocurrió un problema"}</p>
           <p className="mt-1 break-words text-sm leading-6">{message}</p>
-          {sqlstate ? (
-            <p className="mt-2 font-mono text-xs text-rose-700">
-              codigo_sqlstate: {sqlstate}
-            </p>
-          ) : null}
-          {detalles !== undefined ? (
-            <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap rounded-lg bg-white/70 p-3 font-mono text-xs leading-5 text-rose-800">
-              {JSON.stringify(detalles, null, 2)}
-            </pre>
-          ) : null}
           {onRetry ? (
             <button
               type="button"

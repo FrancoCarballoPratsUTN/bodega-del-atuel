@@ -33,6 +33,7 @@ export interface Catalogos {
   salas: Sala[];
   cepas: Cepa[];
   bodegas: Bodega[];
+  tipos_vino: string[];
 }
 
 export interface VinoResumen {
@@ -164,12 +165,5 @@ export interface ComprobantePayload {
   id_sala: number;
   renglones: { cod_vino: number; cantidad: number }[];
 }
-
-export const TIPOS_VINO = [
-  { value: "tinto", label: "Tinto" },
-  { value: "blanco", label: "Blanco" },
-  { value: "rosado", label: "Rosado" },
-  { value: "espumante", label: "Espumante" },
-] as const;
 
 export const PAGE_SIZE = 20;

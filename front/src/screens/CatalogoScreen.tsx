@@ -7,7 +7,7 @@ import {
   formatMoney,
   tipoBadgeClass,
   tipoLabel,
-} from "../lib/display";
+} from "../display";
 import { PAGE_SIZE } from "../types";
 import {
   EMPTY_VINO_FILTERS,
@@ -75,7 +75,7 @@ export function CatalogoScreen({
     <div>
       <PageHeader
         title="Catálogo de vinos"
-        subtitle="Consulta el listado real, filtra por tipo, cepa, bodega y añada, y accedé al detalle registrado en la base."
+        subtitle="Buscá vinos por tipo, cepa, bodega o añada y consultá sus detalles."
         actions={
           <button type="button" onClick={onNew} className={primaryButtonClass}>
             <PlusIcon className="h-4 w-4" />

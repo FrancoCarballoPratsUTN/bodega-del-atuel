@@ -112,10 +112,6 @@ function AppContent() {
           })}
         </nav>
 
-        <div className="border-t border-white/10 px-5 py-4 text-[11px] leading-5 text-white/40">
-          Los datos se consultan en línea a la API. Los importes, descuentos y
-          stock los calcula PostgreSQL.
-        </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">

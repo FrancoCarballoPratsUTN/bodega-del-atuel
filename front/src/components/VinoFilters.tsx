@@ -1,5 +1,5 @@
 import type { Catalogos } from "../types";
-import { TIPOS_VINO } from "../types";
+import { tipoLabel } from "../display";
 import { FormField, ghostButtonClass, inputClass } from "./ui";
 
 export interface VinoFilterValues {
@@ -54,9 +54,9 @@ export function VinoFilters({
           className={inputClass}
         >
           <option value="">Todos los tipos</option>
-          {TIPOS_VINO.map((tipo) => (
-            <option key={tipo.value} value={tipo.value}>
-              {tipo.label}
+          {catalogos.tipos_vino.map((tipo) => (
+            <option key={tipo} value={tipo}>
+              {tipoLabel(tipo)}
             </option>
           ))}
         </select>

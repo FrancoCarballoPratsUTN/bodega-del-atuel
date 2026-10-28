@@ -8,5 +8,5 @@ router = APIRouter(prefix="/catalogos", tags=["Catálogos"])
 
 
 @router.get("")
-def list_catalogos_endpoint() -> dict[str, list[dict[str, Any]]]:
+def list_catalogos_endpoint() -> dict[str, Any]:
     return catalogo_service.list_catalogos()

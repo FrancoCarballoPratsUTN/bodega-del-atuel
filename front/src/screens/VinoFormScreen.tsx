@@ -10,7 +10,7 @@ import {
 import { useCatalogos } from "../context/CatalogosContext";
 import { useApiResource } from "../hooks/useApiResource";
 import type { VinoPayload } from "../types";
-import { TIPOS_VINO } from "../types";
+import { tipoLabel } from "../display";
 import {
   ErrorBanner,
   FormField,
@@ -159,7 +159,7 @@ export function VinoFormScreen({
     <div>
       <PageHeader
         title={editing ? `Editar vino #${codVino}` : "Alta de vino"}
-        subtitle="Los datos se guardan directamente en la base. La API valida la composición y las reglas de negocio."
+        subtitle="Completá los datos del vino y su composición."
         actions={
           <button type="button" onClick={onBack} className={secondaryButtonClass}>
             Volver al catálogo
@@ -241,9 +241,9 @@ export function VinoFormScreen({
                   className={inputClass}
                 >
                   <option value="">Seleccionar tipo</option>
-                  {TIPOS_VINO.map((tipo) => (
-                    <option key={tipo.value} value={tipo.value}>
-                      {tipo.label}
+                  {catalogos.tipos_vino.map((tipo) => (
+                    <option key={tipo} value={tipo}>
+                      {tipoLabel(tipo)}
                     </option>
                   ))}
                 </select>
@@ -259,7 +259,6 @@ export function VinoFormScreen({
                   value={form.aniada}
                   onChange={(event) => updateField("aniada", event.target.value)}
                   className={inputClass}
-                  placeholder="2024"
                 />
               </FormField>
 
@@ -273,7 +272,6 @@ export function VinoFormScreen({
                   value={form.volumen}
                   onChange={(event) => updateField("volumen", event.target.value)}
                   className={inputClass}
-                  placeholder="750"
                 />
               </FormField>
 
@@ -290,7 +288,6 @@ export function VinoFormScreen({
                     updateField("graduacion", event.target.value)
                   }
                   className={inputClass}
-                  placeholder="13.5"
                 />
               </FormField>
 
@@ -304,7 +301,6 @@ export function VinoFormScreen({
                   value={form.precio}
                   onChange={(event) => updateField("precio", event.target.value)}
                   className={inputClass}
-                  placeholder="4200"
                 />
               </FormField>
             </div>
@@ -317,8 +313,7 @@ export function VinoFormScreen({
                   Composición de cepas
                 </h2>
                 <p className="mt-1 text-sm text-wine-900/55">
-                  La API envía los porcentajes a PostgreSQL, que valida que la
-                  composición sume exactamente 100%.
+                  La suma de los porcentajes debe ser exactamente 100%.
                 </p>
               </div>
               <button
@@ -375,7 +370,6 @@ export function VinoFormScreen({
                         updateCepa(index, "porcentaje", event.target.value)
                       }
                       className={inputClass}
-                      placeholder="100"
                     />
                   </FormField>
 

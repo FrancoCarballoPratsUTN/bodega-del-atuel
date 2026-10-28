@@ -16,7 +16,7 @@ import {
   formatDate,
   salaLabel,
   tipoLabel,
-} from "../lib/display";
+} from "../display";
 import type { Transferencia, VinoResumen } from "../types";
 import {
   Badge,
@@ -116,7 +116,7 @@ export function TransferenciasScreen() {
     try {
       await procesarTransferencia(transfer.codigo);
       setTransfer({ ...transfer, estado: "procesado" });
-      setMessage("Transferencia procesada por la base de datos.");
+      setMessage("Transferencia procesada. El stock de la sala fue actualizado.");
     } catch (reason) {
       setError(toApiError(reason));
     } finally {
@@ -128,7 +128,7 @@ export function TransferenciasScreen() {
     <div>
       <PageHeader
         title="Transferencias"
-        subtitle="Creá la solicitud, agregá renglones y avanzá el estado según lo permita la API. El stock se mueve recién al procesar."
+        subtitle="Creá una solicitud, agregá vinos y procesala para actualizar el stock de la sala."
       />
 
       {error ? (
@@ -151,7 +151,6 @@ export function TransferenciasScreen() {
           <FormField
             label="Sala destino"
             htmlFor="transferencia-sala"
-            hint="La sala se envía al crear la solicitud."
           >
             <select
               id="transferencia-sala"
@@ -248,7 +247,7 @@ export function TransferenciasScreen() {
               ) : null}
               {transfer.estado === "procesado" ? (
                 <p className="self-center text-sm font-semibold text-emerald-700">
-                  Transferencia procesada. El stock fue actualizado por la base.
+                  Transferencia procesada. El stock de la sala fue actualizado.
                 </p>
               ) : null}
             </div>
@@ -265,7 +264,7 @@ export function TransferenciasScreen() {
                 Renglones cargados
               </h2>
               <p className="mt-1 text-sm text-wine-900/50">
-                Cada renglón se envía a la API al agregarlo.
+                Productos incluidos en la solicitud.
               </p>
             </div>
 
