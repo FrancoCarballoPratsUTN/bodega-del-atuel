@@ -218,3 +218,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Credenciales locales de migración a Supabase
+db/supabase/.env.local
+docs/MIGRACION_SUPABASE.md
