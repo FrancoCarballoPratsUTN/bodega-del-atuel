@@ -14,7 +14,7 @@ TEST_DATABASE = {
     "port": int(os.getenv("BDA_DATABASE_PORT", "5432")),
     "dbname": os.getenv("BDA_DATABASE_NAME", "bodega_del_atuel"),
     "user": os.getenv("BDA_DATABASE_USER", "rol_api_lectura_escritura"),
-    "password": os.getenv("BDA_DATABASE_PASSWORD", "REDACTED"),
+    "password": os.getenv("BDA_DATABASE_PASSWORD", ""),
     "connect_timeout": 5,
 }
 
@@ -35,6 +35,8 @@ class StaticPool:
 
 @pytest.fixture(scope="session")
 def database_connection():
+    if not TEST_DATABASE["password"]:
+        pytest.skip("Definí BDA_DATABASE_PASSWORD para las pruebas de integración.")
     try:
         connection = psycopg.connect(
             **TEST_DATABASE,

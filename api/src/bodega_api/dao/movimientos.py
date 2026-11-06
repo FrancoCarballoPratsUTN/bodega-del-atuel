@@ -113,3 +113,53 @@ def _finish_document(connection: Connection, query: str, codigo: int) -> bool:
     with connection.cursor() as cursor:
         cursor.execute(query, (codigo,))
         return cursor.rowcount == 1
+
+
+def get_transferencia_lines(
+    connection: Connection,
+    codigo: int,
+) -> list[dict[str, Any]] | None:
+    with connection.cursor(row_factory=dict_row) as cursor:
+        cursor.execute(
+            "SELECT 1 FROM transferencia WHERE nro_transferencia = %s",
+            (codigo,),
+        )
+        if cursor.fetchone() is None:
+            return None
+        cursor.execute(
+            """
+            SELECT rt.cod_vino, v.nombre AS nombre_vino,
+                   rt.cantidad
+              FROM renglon_transferencia rt
+              JOIN vino v ON v.cod_vino = rt.cod_vino
+             WHERE rt.nro_transferencia = %s
+             ORDER BY rt.cod_vino
+            """,
+            (codigo,),
+        )
+        return cursor.fetchall()
+
+
+def get_ingreso_lines(
+    connection: Connection,
+    codigo: int,
+) -> list[dict[str, Any]] | None:
+    with connection.cursor(row_factory=dict_row) as cursor:
+        cursor.execute(
+            "SELECT 1 FROM ingreso WHERE cod_ingreso = %s",
+            (codigo,),
+        )
+        if cursor.fetchone() is None:
+            return None
+        cursor.execute(
+            """
+            SELECT ri.cod_vino, v.nombre AS nombre_vino,
+                   ri.cantidad
+              FROM renglon_ingreso ri
+              JOIN vino v ON v.cod_vino = ri.cod_vino
+             WHERE ri.cod_ingreso = %s
+             ORDER BY ri.cod_vino
+            """,
+            (codigo,),
+        )
+        return cursor.fetchall()

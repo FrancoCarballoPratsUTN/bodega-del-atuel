@@ -4,7 +4,9 @@ from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from psycopg import Error as PostgresError
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.cors import CORSMiddleware
 
+from bodega_api.config import get_cors_origins
 from bodega_api.db import close_pool
 from bodega_api.errors import (
     http_exception_handler,
@@ -37,6 +39,13 @@ app = FastAPI(
     version="0.1.0",
     description="API REST sobre la base PostgreSQL de Bodegas del Atuel.",
     lifespan=lifespan,
+)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=get_cors_origins(),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 app.add_exception_handler(PostgresError, postgres_error_handler())
 app.add_exception_handler(StarletteHTTPException, http_exception_handler)

@@ -6,6 +6,19 @@ pytestmark = pytest.mark.integration
 
 
 def test_create_comprobante_calculates_totals_and_updates_stock(api_client, db):
+    # La prueba no depende del stock que traiga la carga: garantiza 10
+    # unidades en la transacción y el fixture revierte todo al finalizar.
+    for cod_vino in (1, 2):
+        db.execute(
+            """
+            INSERT INTO stock_sala (id_sala, cod_vino, cantidad)
+            VALUES (1, %s, 10)
+            ON CONFLICT (id_sala, cod_vino)
+            DO UPDATE SET cantidad = GREATEST(stock_sala.cantidad, 10)
+            """,
+            (cod_vino,),
+        )
+
     stock_before = db.execute(
         "SELECT cantidad FROM stock_sala WHERE id_sala = 1 AND cod_vino = 1"
     ).fetchone()["cantidad"]

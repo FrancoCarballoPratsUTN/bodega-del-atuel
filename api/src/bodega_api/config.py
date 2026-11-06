@@ -1,3 +1,4 @@
+import os
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -9,9 +10,9 @@ class Settings(BaseSettings):
     database_name: str = "bodega_del_atuel"
     database_user: str = "rol_api_lectura_escritura"
     database_password: str
+    database_sslmode: str = "prefer"
     database_pool_min_size: int = 1
     database_pool_max_size: int = 10
-
     model_config = SettingsConfigDict(
         env_file=".env",
         env_prefix="BDA_",
@@ -23,10 +24,23 @@ class Settings(BaseSettings):
         return (
             f"host={self.database_host} port={self.database_port} "
             f"dbname={self.database_name} user={self.database_user} "
-            f"password={self.database_password}"
+            f"password={self.database_password} sslmode={self.database_sslmode}"
         )
 
 
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+def get_cors_origins() -> list[str]:
+    configured_origins = os.getenv(
+        "BDA_CORS_ORIGINS",
+        "https://bodega-del-atuel-front.franco11carballo.workers.dev,"
+        "http://localhost:5173,http://localhost:3000",
+    )
+    return [
+        origin.strip()
+        for origin in configured_origins.split(",")
+        if origin.strip()
+    ]

@@ -37,9 +37,10 @@ INSERT INTO finca (id_finca, id_departamento, nombre, superficie) VALUES (1, 1, 
 INSERT INTO parcela (id_finca, nro_parcela, id_cepa, superficie, anio_plantacion) VALUES (1, 1, 1, 10.00, 2015);
 INSERT INTO bodega (cuit_bodega, razon_social, domicilio) VALUES ('30501234567', 'Bodega del Atuel', 'Calle Cubillos km 10');
 
--- Cliente Socio (10% de descuento derivado por RN-06)
+-- Cliente Exportador (30% de descuento derivado por RN-06)
 INSERT INTO cliente (id_cliente, cp_localidad, nombre_razon_social, tipo_doc, nro_doc, direccion, fecha_alta, descuento, tipo_cliente) 
-VALUES (1, 5600, 'Juan Gomez', 'DNI', '35123456', 'Mitre 120', '2023-05-10', 10.00, 'Socio');
+VALUES (1, 5600, 'Juan Gomez', 'DNI', '35123456', 'Mitre 120', '2023-05-10', 30.00, 'Exportador');
+INSERT INTO exportador (id_cliente, pais_destino) VALUES (1, 'Brasil');
 
 -- RN-01: El precio de un vino es único y mayor que cero.
 -- Caso OK: Inserción válida con precio > 0
@@ -115,7 +116,6 @@ END $$;
 
 -- RN-07: Permisos de exportación: fecha_vencimiento > fecha_emision.
 -- Caso OK: Fechas en orden cronológico
-INSERT INTO exportador (id_cliente, pais_destino) VALUES (1, 'Brasil');
 INSERT INTO permiso_exportacion (cod_permiso, id_cliente, fecha_emision, fecha_vencimiento) 
 VALUES (1, 1, '2024-01-01', '2024-12-31');
 SELECT registrar_test('RN-07', 'Permiso con fechas válidas registrado', TRUE);

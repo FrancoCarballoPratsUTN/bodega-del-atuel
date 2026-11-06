@@ -51,3 +51,19 @@ def finish_ingreso(codigo: int) -> None:
 def process_ingreso(codigo: int) -> None:
     with db.transaction() as connection:
         movimientos_dao.process_ingreso(connection, codigo)
+
+
+def get_transferencia_lines(codigo: int) -> list[dict[str, Any]]:
+    with db.transaction() as connection:
+        lines = movimientos_dao.get_transferencia_lines(connection, codigo)
+        if lines is None:
+            raise NotFoundError("Transferencia no encontrada.")
+        return lines
+
+
+def get_ingreso_lines(codigo: int) -> list[dict[str, Any]]:
+    with db.transaction() as connection:
+        lines = movimientos_dao.get_ingreso_lines(connection, codigo)
+        if lines is None:
+            raise NotFoundError("Ingreso no encontrado.")
+        return lines

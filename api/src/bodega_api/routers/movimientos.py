@@ -18,6 +18,11 @@ def create_transferencia_endpoint(data: TransferenciaInput) -> dict[str, Any]:
     return movimiento_service.create_transferencia(data.id_sala)
 
 
+@transferencias_router.get("/{codigo}/renglones")
+def list_transferencia_lines_endpoint(codigo: int) -> list[dict[str, Any]]:
+    return movimiento_service.get_transferencia_lines(codigo)
+
+
 @transferencias_router.post("/{codigo}/renglones", status_code=204)
 def add_transferencia_line_endpoint(
     codigo: int,
@@ -42,6 +47,11 @@ def create_ingreso_endpoint(data: IngresoInput) -> dict[str, Any]:
         data.cod_transportista,
         data.cuit_bodega,
     )
+
+
+@ingresos_router.get("/{codigo}/renglones")
+def list_ingreso_lines_endpoint(codigo: int) -> list[dict[str, Any]]:
+    return movimiento_service.get_ingreso_lines(codigo)
 
 
 @ingresos_router.post("/{codigo}/renglones", status_code=204)

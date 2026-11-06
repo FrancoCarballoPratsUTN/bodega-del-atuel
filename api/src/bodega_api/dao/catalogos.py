@@ -50,6 +50,8 @@ def _fetch_all(
 
 
 def list_tipos_vino(connection: Connection) -> Sequence[str]:
-    with connection.cursor() as cursor:
-        cursor.execute("SELECT DISTINCT tipo FROM vino WHERE activo = TRUE ORDER BY tipo")
-        return [row[0] for row in cursor.fetchall()]
+    with connection.cursor(row_factory=dict_row) as cursor:
+        cursor.execute(
+            "SELECT DISTINCT tipo FROM vino WHERE activo = TRUE ORDER BY tipo"
+        )
+        return [row["tipo"] for row in cursor.fetchall()]

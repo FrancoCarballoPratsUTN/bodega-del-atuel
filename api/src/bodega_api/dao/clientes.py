@@ -96,6 +96,11 @@ def update_cliente(
             return None
         previous_type = current["tipo_cliente"]
 
+        # La herencia disjunta exige quitar el subtipo anterior antes de
+        # cambiar tipo_cliente; el trigger de consistencia lo verifica.
+        if previous_type != data["tipo_cliente"]:
+            _delete_subtype(connection, id_cliente, previous_type)
+
         cursor.execute(
             """
             UPDATE cliente
@@ -123,7 +128,6 @@ def update_cliente(
         )
 
     if previous_type != data["tipo_cliente"]:
-        _delete_subtype(connection, id_cliente, previous_type)
         _insert_subtype(connection, id_cliente, data)
     else:
         _update_subtype(connection, id_cliente, data)
