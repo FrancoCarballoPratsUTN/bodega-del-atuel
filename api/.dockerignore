@@ -2,5 +2,14 @@
 __pycache__
 *.pyc
 .pytest_cache
+.ruff_cache
 .env
+.env.*
 tests
+.git
+.gitignore
+.aws
+.codex
+.agents
+Dockerfile
+.dockerignore

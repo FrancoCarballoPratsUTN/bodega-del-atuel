@@ -147,9 +147,8 @@ done
 
 ### Datos
 
-- `db/seed/dump_datos.sql.gz`: datos actuales (solo `COPY` y secuencias).
-- `db/seed/dump_completo.sql.gz`: volcado completo (esquema + datos) de la
-  Etapa 3, útil para inspección y restauración histórica.
+- `db/seed/dump_datos.sql.gz`: datos actuales (solo `COPY` y secuencias). Es el
+  archivo que carga Docker Compose después de las migraciones.
 - `db/seed/seed.py`: carga reproducible desde los CSV de `db/seed/csv/`.
   Requiere `Faker` y `psycopg2-binary`. Ver `db/seed/README.md`.
 
@@ -166,10 +165,13 @@ Conteos principales del dataset:
 | `lote_uva` | 600 |
 | `analisis_calidad` | 1.200 |
 
-### Restaurar el volcado completo
+### Restaurar los datos manualmente
+
+Con el esquema ya migrado (por ejemplo, tras `docker compose up` o aplicando
+`db/migrations/*.sql`):
 
 ```bash
-gzip -dc db/seed/dump_completo.sql.gz | \
+gzip -dc db/seed/dump_datos.sql.gz | \
   psql -h localhost -p 5433 -U postgresql -d bodega_del_atuel
 ```
 

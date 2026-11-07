@@ -104,26 +104,27 @@ Documentación interactiva:
 
 ### 3.2. Docker Compose
 
-El `docker-compose.yml` de la raíz levanta PostgreSQL 15.4 y la API. La base se
-inicializa desde `db/seed/dump_completo.sql.gz`, luego aplica roles, índices, la
-versión vigente de los triggers y la contraseña del rol API.
+El `docker-compose.yml` de la raíz levanta PostgreSQL 17, la API y el front
+(nginx). La base se inicializa aplicando las migraciones `001` a `008` en orden
+y luego carga `db/seed/dump_datos.sql.gz` (solo datos).
 
 ```bash
 cp .env.example .env
 docker compose up -d --build
 docker compose ps
-curl http://localhost:8000/health
+curl http://localhost:8000/salud
 ```
 
 Servicios y puertos por defecto:
 
 | Servicio | Contenedor | Puerto host | Puerto interno |
 |---|---|---:|---:|
-| `db` | PostgreSQL 15.4 | `5433` | `5432` |
+| `db` | PostgreSQL 17 | `5433` | `5432` |
 | `api` | Uvicorn + FastAPI | `8000` | `8000` |
+| `front` | nginx + build de Vite | `8080` | `80` |
 
 La API espera el `healthcheck` de PostgreSQL antes de arrancar. El primer
-arranque tarda más porque restaura el dump completo.
+arranque tarda más porque aplica las migraciones y restaura los datos.
 
 Para reiniciar desde cero, incluido el volumen de datos:
 
@@ -138,15 +139,20 @@ Para detener sin borrar datos:
 docker compose down
 ```
 
-### 3.3. Front temporal de pruebas
+### 3.3. Front local
 
-El front se puede levantar junto con la base y la API usando el override de
-pruebas. Es una configuración temporal con Vite en modo desarrollo; el
-despliegue definitivo se resolverá más adelante.
+El front se construye con `front/Dockerfile` y se sirve con nginx. nginx
+resuelve `/api/*` contra `http://api:8000/*`, por lo que el navegador usa el
+mismo origen y no hace falta CORS en local.
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.test.yml up --build
+docker compose up --build
+# Front: http://localhost:8080
 ```
+
+El front desplegado en Cloudflare Workers usa `VITE_API_URL` para apuntar
+directo a la API de Render; ese valor se configura en el build del proveedor,
+no en el compose local.
 
 | Servicio | Contenedor | Puerto host | Puerto interno |
 |---|---|---:|---:|

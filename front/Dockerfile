@@ -4,6 +4,7 @@ WORKDIR /app
 
 RUN npm install -g pnpm@9.10.0
 
+# Dependencias primero para aprovechar la caché de capas.
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 

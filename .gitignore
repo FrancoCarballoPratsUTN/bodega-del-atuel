@@ -222,3 +222,6 @@ __marimo__/
 # Credenciales locales de migración a Supabase
 db/supabase/*
 docs/MIGRACION_SUPABASE.md
+
+# Dump completo generado localmente por db/seed/seed.py --dump
+db/seed/dump_completo.sql.gz

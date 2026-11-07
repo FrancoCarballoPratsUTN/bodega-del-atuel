@@ -49,7 +49,9 @@ Generar también el dump comprimido:
 python3 db/seed/seed.py --reset --dump
 ```
 
-El archivo generado es `db/seed/dump_completo.sql.gz`.
+El archivo generado es `db/seed/dump_completo.sql.gz`. Es un artefacto local
+(esquema + datos) que no se versiona: el dump de datos que usa Docker Compose
+es `db/seed/dump_datos.sql.gz`.
 
 ## Etapa 3, punto 5: triggers durante la carga histórica
 
@@ -116,8 +118,9 @@ La opción `--dump` ejecuta `pg_dump` y comprime su salida en:
 db/seed/dump_completo.sql.gz
 ```
 
+Este archivo es un artefacto local (esquema + datos) y está en `.gitignore`.
 Si `pg_dump` no está instalado en el sistema local, el script utiliza
-`docker exec postgresql pg_dump`. El archivo generado fue validado con:
+`docker exec postgresql pg_dump`. El archivo generado se puede validar con:
 
 ```bash
 gzip -t db/seed/dump_completo.sql.gz
@@ -127,5 +130,14 @@ Para restaurarlo en una base PostgreSQL vacía:
 
 ```bash
 gzip -dc db/seed/dump_completo.sql.gz | \
+  psql -U postgresql -d bodega_del_atuel
+```
+
+El dump versionado del entregable es `db/seed/dump_datos.sql.gz`, generado con
+`pg_dump --data-only` sobre la base ya migrada. Se restaura después de aplicar
+`db/migrations/*.sql`:
+
+```bash
+gzip -dc db/seed/dump_datos.sql.gz | \
   psql -U postgresql -d bodega_del_atuel
 ```

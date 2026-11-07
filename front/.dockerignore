@@ -3,5 +3,10 @@ dist
 .figma
 .git
 .gitignore
+.gitattributes
+Dockerfile
 Dockerfile.dev
+.dockerignore
+.env
+.env.*
 *.log
