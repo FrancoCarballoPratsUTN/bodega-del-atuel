@@ -224,12 +224,12 @@ cuando corresponde.
 | Documento | Contenido |
 |---|---|
 | `docs/INFORME_FINAL.md` | Informe final según la estructura 10.2 del enunciado. |
-| `docs/TRAZABILIDAD_RN.md` | Tabla regla de negocio → mecanismo → prueba. |
+| `docs/Etapa 1_ Modelado (MER, DER, DICCIONARIO, DISEÑO)/` | MER, DER, modelo relacional, diccionario de datos y decisiones de diseño. |
+| `docs/Etapa 2. Integridad y lógica en la base de datos /` | Tabla de trazabilidad RN → mecanismo → prueba y demostración de concurrencia. |
 | `docs/ETAPA8_DESPLIEGUE.md` | Despliegue en la nube, proveedores, backup y evidencias. |
 | `docs/ETAPA6_API.md` | Arquitectura, endpoints y errores de la API. |
 | `docs/ETAPA5_CONSULTAS.md` | Decisiones de las consultas SQL. |
 | `docs/RENDIMIENTO_INDICES.md` | Comparativas `EXPLAIN (ANALYZE, BUFFERS)`. |
-| `docs/CONCURRENCIA.md` | Demostración de dos sesiones y `FOR UPDATE`. |
 | `db/seed/README.md` | Carga masiva y controles. |
 
 ## Seguridad

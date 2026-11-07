@@ -25,7 +25,7 @@ consuman sin reimplementarlas.
 | API REST | 22 paths y 30 operaciones; 81 pruebas automáticas. |
 | Front | Cinco pantallas contra la API real. |
 | Despliegue | Supabase + Render + Cloudflare Workers, con HTTPS, CORS, backup y restauración. |
-| Documentación | README, este informe, trazabilidad RN, concurrencia, rendimiento y Etapa 8. |
+| Documentación | README, este informe, carpetas de Etapa 1 y Etapa 2, rendimiento y Etapa 8. |
 
 ### 1.2. Fuera de alcance
 
@@ -56,265 +56,32 @@ consuman sin reimplementarlas.
 
 ## 2. Modelo de datos
 
-### 2.1. Diagrama entidad-relación
+El modelado completo está en la carpeta de la **Etapa 1**, que contiene los
+diagramas, el diccionario y las decisiones de diseño definitivas:
 
-El modelo se organiza en seis bloques: geografía, producción, productos,
-clientes, movimientos y stock/auditoría. Las relaciones principales son:
-
-```mermaid
-erDiagram
-    PROVINCIA ||--o{ DEPARTAMENTO : contiene
-    DEPARTAMENTO ||--o{ FINCA : ubica
-    PROVINCIA ||--o{ LOCALIDAD : contiene
-    LOCALIDAD ||--o{ SALA_VENTA : ubica
-    LOCALIDAD ||--o{ CLIENTE : ubica
-    SALA_VENTA ||--o{ EMPLEADO : emplea
-    EMPLEADO ||--o{ LOCALIDAD : "es encargado"
-    FINCA ||--o{ PARCELA : posee
-    CEPA ||--o{ PARCELA : planta
-    PARCELA ||--o{ LOTE_UVA : cosecha
-    LOTE_UVA ||--o{ ANALISIS_CALIDAD : analiza
-    BODEGA ||--o{ VINO : elabora
-    BODEGA ||--o{ LOTE_UVA : recibe
-    VINO ||--o{ COMPOSICION : compone
-    CEPA ||--o{ COMPOSICION : integra
-    VINO ||--o{ VINO_MARIDAJE : marida
-    MARIDAJE ||--o{ VINO_MARIDAJE : aplica
-    CLIENTE ||--o| DISTRIBUIDOR : especializa
-    CLIENTE ||--o| EXPORTADOR : especializa
-    EXPORTADOR ||--o{ PERMISO_EXPORTACION : posee
-    CLIENTE ||--o{ COMPROBANTE : compra
-    SALA_VENTA ||--o{ COMPROBANTE : vende
-    COMPROBANTE ||--o{ RENGLON_COMPROBANTE : detalla
-    VINO ||--o{ RENGLON_COMPROBANTE : incluye
-    TRANSPORTISTA ||--o{ INGRESO : traslada
-    INGRESO ||--o{ RENGLON_INGRESO : detalla
-    TRANSFERENCIA ||--o{ RENGLON_TRANSFERENCIA : detalla
-    SALA_VENTA ||--o{ TRANSFERENCIA : recibe
-    VINO ||--o{ STOCK_SALA : almacena
-    SALA_VENTA ||--o{ STOCK_SALA : ubica
-    VINO ||--o{ STOCK_DEPOSITO : almacena
-    VINO ||--o{ AUDITORIA_PRECIO : audita
-```
-
-### 2.2. Esquema relacional
-
-| Bloque | Tablas | Clave primaria |
-|---|---|---|
-| Geografía | `provincia`, `departamento`, `localidad` | `id_provincia`, `id_departamento`, `cp` |
-| Salas y personal | `sala_venta`, `empleado` | `id_sala`, `cuit` |
-| Transporte | `transportista`, `transportista_cubre_localidad` | `cod_transportista`; PK compuesta |
-| Producción | `finca`, `parcela`, `lote_uva`, `analisis_calidad` | `id_finca`; `(id_finca, nro_parcela)`; `nro_lote`; `id_analisis` |
-| Productos | `cepa`, `bodega`, `vino`, `maridaje`, `composicion`, `vino_maridaje` | `id_cepa`, `cuit_bodega`, `cod_vino`, `id_maridaje`; PK compuestas |
-| Clientes | `cliente`, `distribuidor`, `exportador`, `permiso_exportacion` | `id_cliente`; subtipos con la misma PK |
-| Ventas | `comprobante`, `renglon_comprobante` | `nro_comprobante`; `(nro_comprobante, cod_vino)` |
-| Ingresos | `ingreso`, `renglon_ingreso` | `cod_ingreso`; `(cod_ingreso, cod_vino)` |
-| Transferencias | `transferencia`, `renglon_transferencia` | `nro_transferencia`; `(nro_transferencia, cod_vino)` |
-| Stock y auditoría | `stock_sala`, `stock_deposito`, `auditoria_precio` | `(id_sala, cod_vino)`, `cod_vino`, `id_auditoria` |
-
-Las 37 claves foráneas usan `ON DELETE RESTRICT` salvo las relaciones de
-detalle (`renglon_*`), la composición, los maridajes y los subtipos de cliente,
-que usan `ON DELETE CASCADE`. Esa diferencia es deliberada: un documento puede
-borrarse con su detalle, pero una bodega, un vino o un transportista con
-movimientos no puede desaparecer.
-
-### 2.3. Normalización
-
-El esquema está en **tercera forma normal**:
-
-- **1FN:** todos los atributos son atómicos. No hay listas de cepas ni de
-  maridajes dentro de `vino`; se resuelven con `composicion` y
-  `vino_maridaje`. Tampoco se repiten teléfonos o direcciones en columnas
-  múltiples.
-- **2FN:** en las tablas con clave compuesta, cada atributo depende de toda la
-  clave. En `renglon_comprobante`, `cantidad`, `precio_unitario`, `descuento` y
-  `subtotal` dependen de `(nro_comprobante, cod_vino)`, no solo del comprobante.
-  En `composicion`, `porcentaje` depende de `(cod_vino, id_cepa)`.
-- **3FN:** no hay dependencias transitivas. `localidad` guarda `id_provincia`,
-  no el nombre de la provincia; `vino` guarda `cuit_bodega`, no la razón social
-  de la bodega; `comprobante` no guarda el nombre ni el tipo del cliente.
-
-La única redundancia intencional es `comprobante.subtotal`, `descuento` y
-`total`, que se derivan de los renglones. Se mantienen por rendimiento y por
-requisito del enunciado, y los triggers los recalculan en cada cambio para que
-nunca queden desactualizados. Es una **desnormalización controlada**, no una
-violación de 3FN: los valores no se cargan a mano.
-
-### 2.4. Diccionario de datos
-
-| Tabla | Propósito | Columnas relevantes |
-|---|---|---|
-| `provincia` | Catálogo geográfico de primer nivel. | `id_provincia`, `nombre` |
-| `departamento` | División de una provincia. | `id_departamento`, `id_provincia`, `nombre` |
-| `localidad` | Ciudad o localidad con encargado regional. | `cp`, `nombre`, `id_provincia`, `cuit_encargado_regional` |
-| `sala_venta` | Punto de venta con día de cierre. | `id_sala`, `cp_localidad`, `calle`, `numero`, `dia_cierre`, `activo` |
-| `empleado` | Personal asignado a una sala. | `cuit`, `id_sala`, `nombre`, `fecha_ingreso`, `salario`, `activo` |
-| `transportista` | Empresa que traslada ingresos. | `cod_transportista`, `razon_social`, `cuit`, `email`, `telefono`, `domicilio` |
-| `transportista_cubre_localidad` | Cobertura N:M entre transportista y localidad. | `cod_transportista`, `cp_localidad` |
-| `cepa` | Variedad de uva. | `id_cepa`, `nombre`, `tipo` |
-| `finca` | Explotación agrícola. | `id_finca`, `id_departamento`, `nombre`, `superficie` |
-| `parcela` | Entidad débil de finca, con cepa y año de plantación. | `id_finca`, `nro_parcela`, `id_cepa`, `superficie`, `anio_plantacion` |
-| `bodega` | Elaborador de vinos. | `cuit_bodega`, `razon_social`, `domicilio` |
-| `lote_uva` | Cosecha de una parcela en una campaña. | `nro_lote`, `id_finca`, `nro_parcela`, `cuit_bodega`, `campania`, `fecha`, `kg` |
-| `analisis_calidad` | Análisis de un lote de uva. | `id_analisis`, `nro_lote`, `fecha`, `brix`, `ph`, `acidez` |
-| `vino` | Producto elaborado. | `cod_vino`, `cuit_bodega`, `nombre`, `tipo`, `aniada`, `volumen`, `graduacion`, `precio`, `activo` |
-| `maridaje` | Combinación gastronómica. | `id_maridaje`, `nombre`, `temp_servicio` |
-| `composicion` | Porcentaje de cada cepa en un vino. | `cod_vino`, `id_cepa`, `porcentaje` |
-| `vino_maridaje` | Asociación N:M vino–maridaje. | `cod_vino`, `id_maridaje` |
-| `cliente` | Persona o empresa que compra. | `id_cliente`, `cp_localidad`, `nombre_razon_social`, `tipo_doc`, `nro_doc`, `descuento`, `tipo_cliente`, `activo` |
-| `distribuidor` | Subtipo con zona y habilitación. | `id_cliente`, `zona_cobertura`, `nro_habilitacion` |
-| `exportador` | Subtipo con país de destino. | `id_cliente`, `pais_destino` |
-| `permiso_exportacion` | Permisos con vigencia. | `cod_permiso`, `id_cliente`, `fecha_emision`, `fecha_vencimiento` |
-| `comprobante` | Cabecera de venta. | `nro_comprobante`, `id_cliente`, `id_sala`, `fecha`, `subtotal`, `descuento`, `total` |
-| `renglon_comprobante` | Detalle de venta por vino. | `nro_comprobante`, `cod_vino`, `cantidad`, `precio_unitario`, `descuento`, `subtotal` |
-| `ingreso` | Documento de ingreso de mercadería. | `cod_ingreso`, `cod_transportista`, `cuit_bodega`, `fecha`, `estado` |
-| `renglon_ingreso` | Detalle del ingreso. | `cod_ingreso`, `cod_vino`, `cantidad` |
-| `transferencia` | Pedido de stock de una sala al depósito. | `nro_transferencia`, `id_sala`, `fecha_confeccion`, `estado` |
-| `renglon_transferencia` | Detalle de la transferencia. | `nro_transferencia`, `cod_vino`, `cantidad` |
-| `stock_sala` | Stock materializado por sala y vino. | `id_sala`, `cod_vino`, `cantidad` |
-| `stock_deposito` | Stock materializado del depósito central. | `cod_vino`, `cantidad` |
-| `auditoria_precio` | Historial de cambios de precio. | `id_auditoria`, `cod_vino`, `precio_anterior`, `precio_nuevo`, `fecha_hora`, `usuario` |
-
-Vistas:
-
-| Vista | Contenido |
+| Documento | Contenido |
 |---|---|
-| `stock_total_vino` | Stock por vino sumando depósito y todas las salas. |
-| `ventas_mensuales_sala` | Ventas, botellas y monto por sala y mes. |
-| `documentos_pendientes` | Ingresos y transferencias que no están procesados. |
+| [`Diagramas/2.Modelo Entidad Relación.pdf`](<Etapa 1_ Modelado (MER, DER, DICCIONARIO, DISEÑO)/Diagramas/2.Modelo Entidad Relación.pdf>) | Modelo entidad-relación. |
+| [`Diagramas/4.Modelo Relacional.drawio.pdf`](<Etapa 1_ Modelado (MER, DER, DICCIONARIO, DISEÑO)/Diagramas/4.Modelo Relacional.drawio.pdf>) | Modelo relacional. |
+| [`Diccionario de Datos - Bodegas del Atuel.xlsx`](<Etapa 1_ Modelado (MER, DER, DICCIONARIO, DISEÑO)/Diccionario de Datos - Bodegas del Atuel.xlsx>) | Diccionario de datos. |
+| [`Decisones de Diseño.docx`](<Etapa 1_ Modelado (MER, DER, DICCIONARIO, DISEÑO)/Decisones de Diseño.docx>) | Decisiones de diseño justificadas por escrito. |
 
-### 2.5. Decisiones de diseño
-
-1. **Claves sustitutas en entidades fuertes.** `vino`, `cliente`,
-   `comprobante`, `ingreso` y `transferencia` usan `SERIAL`. Son identificadores
-   estables que no cambian aunque cambie el nombre o el documento.
-2. **Claves naturales en catálogos.** `provincia`, `departamento`, `localidad`
-   y `bodega` usan el código o CUIT porque ya son identificadores del dominio.
-3. **Entidad débil `parcela`.** Su PK es `(id_finca, nro_parcela)`: una parcela
-   no existe sin finca y su número solo es único dentro de ella.
-4. **Herencia disjunta de clientes.** `cliente` guarda lo común y
-   `distribuidor` / `exportador` lo específico. La PK de los subtipos es la
-   misma FK a `cliente`, lo que garantiza la relación 1:1. Los triggers
-   impiden que un cliente tenga el subtipo equivocado o ambos a la vez.
-5. **N:M con atributos.** `composicion` no es una simple tabla de unión: lleva
-   `porcentaje`, y un trigger diferido verifica que la suma sea 100.
-6. **Dominio `cuit_dom`.** Unifica el formato de todos los CUIT y agrega un
-   `CHECK` de 11 dígitos. Evita repetir la validación en cada tabla.
-7. **Tipos enumerados.** `estado_enum` y `dia_semana_enum` restringen los
-   valores posibles sin tablas auxiliares.
-8. **Baja lógica (soft delete).** `vino`, `cliente`, `sala_venta`, `empleado`,
-   `finca`, `parcela`, `bodega` y `transportista` tienen la columna `activo`.
-   La API da de baja vinos y clientes con `UPDATE ... SET activo = FALSE`, nunca
-   con `DELETE`. Esto conserva el historial de ventas, auditoría y relaciones.
-   Los listados filtran por `activo = TRUE` y el detalle de un recurso inactivo
-   devuelve `404`. No hay endpoint de reactivación; la única vía es actualizar
-   directamente en la base. La regla RN-14 (`ON DELETE RESTRICT`) sigue vigente
-   para borrados físicos directos, que la API nunca ejecuta.
-9. **FK diferida `localidad` → `empleado`.** El encargado regional se referencia
-   con `DEFERRABLE INITIALLY DEFERRED` para permitir cargar localidades y
-   empleados en el mismo proceso sin un orden rígido.
-10. **Stock materializado.** `stock_sala` y `stock_deposito` guardan cantidades
-    actuales para evitar sumar todos los movimientos en cada venta. Los
-    triggers y procedimientos los mantienen consistentes.
-
-11. **Acciones referenciales (`ON DELETE` / `ON UPDATE`).** Se eligió
-    `ON DELETE RESTRICT` para todas las FK que apuntan a entidades maestras
-    (bodega, vino, transportista, sala, cliente, finca, cepa, localidad,
-    empleado). Motivo: conservar el historial de ventas y movimientos; borrar
-    una entidad con movimientos asociados rompería la trazabilidad. Se eligió
-    `ON DELETE CASCADE` para las tablas de detalle (`renglon_*`), composición,
-    maridajes y subtipos de cliente, porque no tienen sentido sin su padre.
-    `ON UPDATE CASCADE` se aplicó en `sala_venta.cp_localidad`,
-    `localidad.cuit_encargado_regional`, `lote_uva.cuit_bodega`,
-    `vino.cuit_bodega`, `ingreso.cuit_bodega`, `comprobante.id_sala` e
-    `empleado.id_sala` para que un cambio de código natural (CUIT, sala,
-    localidad) se propague automáticamente a las filas dependientes sin perder
-    integridad. El resto de las FK usa `ON UPDATE NO ACTION` (default), porque
-    las claves sustitutas (`SERIAL`) no cambian y las claves naturales que
-    podrían cambiar (CUIT) ya tienen CASCADE donde corresponde.
+Los archivos editables de los diagramas son `1.ModeloEntidadRelación.drawio` y
+`3.Modelo Relacional.drawio`, en la misma carpeta `Diagramas`.
 
 ## 3. Integridad y lógica en la base
 
-### 3.1. Tabla de trazabilidad regla → mecanismo → prueba
+La definición completa está en la carpeta de la **Etapa 2**, con la tabla de
+trazabilidad regla de negocio → mecanismo → caso de prueba y la demostración de
+concurrencia:
 
-La tabla completa está en [`docs/TRAZABILIDAD_RN.md`](TRAZABILIDAD_RN.md). El
-resumen es:
+| Documento | Contenido |
+|---|---|
+| [`Tabla de Trazabilidad.docx`](<Etapa 2. Integridad y lógica en la base de datos /Tabla de Trazabilidad.docx>) | Trazabilidad RN → mecanismo → prueba. |
+| [`Concurrencia.docx`](<Etapa 2. Integridad y lógica en la base de datos /Concurrencia.docx>) | Demostración con y sin `FOR UPDATE`. |
 
-| RN | Regla | Mecanismo | Prueba | Estado |
-|---|---|---|---|---|
-| RN-01 | Precio de vino único y mayor que cero. | `UNIQUE (nombre, aniada, volumen)` + `CHECK (precio > 0)` | `RN-01` | PASSED |
-| RN-02 | Sala en una localidad con encargado existente. | FKs `sala_venta.cp_localidad` y `localidad.cuit_encargado_regional` | `RN-02` | PASSED |
-| RN-03 | Cada empleado trabaja en una sola sala. | `empleado.id_sala NOT NULL` + FK | `RN-03` | PASSED |
-| RN-04 | Una parcela se cosecha una vez por campaña. | `UNIQUE (id_finca, nro_parcela, campania)` | `RN-04` | PASSED |
-| RN-05 | La composición suma 100 %. | Constraint triggers diferidos | `RN-05` | PASSED |
-| RN-06 | Descuento por tipo de cliente. | `CHECK chk_cliente_descuento` | `RN-06` | PASSED |
-| RN-07 | Vencimiento del permiso posterior a la emisión. | `CHECK chk_permiso_fechas` | `RN-07` | PASSED |
-| RN-08 | El total se deriva de los renglones. | Triggers de subtotal, importes y `fn_importes_comprobante` | `RN-08` | PASSED |
-| RN-09 | No vender más que el stock de la sala. | `trg_renglon_validar_stock` + `trg_renglon_actualizar_venta` | `RN-09` | PASSED |
-| RN-10 | Solo un ingreso terminado pasa a procesado. | `trg_ingreso_estados` + `sp_procesar_ingreso` | `RN-10` | PASSED |
-| RN-11 | Transiciones válidas de transferencia y fecha inmodificable. | `trg_transferencia_estados` + `trg_transferencia_fecha` | `RN-11` | PASSED |
-| RN-12 | Documentos fuera de confección no admiten cambios. | Triggers de bloqueo de renglones | `RN-12` | PASSED |
-| RN-13 | Auditoría de cambios de precio. | `trg_vino_auditoria` | `RN-13` | PASSED |
-| RN-14 | No borrar entidades con movimientos. | FKs `ON DELETE RESTRICT` | `RN-14` | PASSED |
-| RN-15 | Graduación entre 5 y 20 grados. | `CHECK chk_vino_graduacion` | `RN-15` | PASSED |
-
-Las 21 pruebas se ejecutan con `./tests/run_db_tests.sh` y terminan con
-`PASSED`.
-
-### 3.2. Guía: dónde va cada regla
-
-| Tipo de regla | Mecanismo | Ejemplo |
-|---|---|---|
-| Valor puntual o rango | `CHECK` | Precio > 0, graduación 5–20, stock ≥ 0. |
-| Unicidad | `UNIQUE` | Documento de cliente, identidad de vino, cosecha por campaña. |
-| Existencia de una referencia | FK | Sala → localidad, renglón → comprobante. |
-| Cálculo derivado | Trigger `BEFORE`/`AFTER` | Subtotal de renglón, total de comprobante. |
-| Validación que depende de varias filas | Constraint trigger diferido | Composición que suma 100. |
-| Transición de estado | Trigger + procedimiento | Ingreso y transferencia. |
-| Operación de varios pasos | Procedimiento almacenado | Procesar ingreso o transferencia. |
-| Historial | Trigger de auditoría | Cambio de precio. |
-| Protección del historial | `ON DELETE RESTRICT` | Bodega con vinos o movimientos. |
-
-El criterio general fue: **si PostgreSQL puede expresarlo como constraint, va
-como constraint**; si necesita varias filas o una transición, va como trigger o
-procedimiento; si es un cálculo repetitivo, va como función.
-
-### 3.3. Demostración de concurrencia
-
-Se ejecutaron dos sesiones simultáneas sobre la última botella de la sala 1,
-vino 1. La salida real está en [`docs/CONCURRENCIA.md`](CONCURRENCIA.md):
-
-```text
-== Con FOR UPDATE (implementación real) ==
-sesion_A: COMMIT | comprobante=150038
-sesion_B: ROLLBACK | SQLSTATE=P0001 | Stock insuficiente en la sala 1 para el vino 1. Disponible: 0, Solicitado: 1
-stock_final=0 comprobantes_confirmados=1
-
-== Sin FOR UPDATE (variante de comparación) ==
-sesion_A: COMMIT | comprobante=150040
-sesion_B: ROLLBACK | SQLSTATE=23514 | ... violates check constraint "chk_stock_sala_positivo"
-stock_final=0 comprobantes_confirmados=1
-```
-
-Con `FOR UPDATE` la segunda sesión espera, ve el stock actualizado y recibe un
-error de negocio claro. Sin bloqueo, el `CHECK` igual impide el oversell, pero
-el mensaje es menos útil. La base nunca vende dos veces la misma botella.
-
-### 3.4. Recuento de objetos
-
-| Objeto | Cantidad |
-|---|---:|
-| Tablas | 30 |
-| Vistas | 3 |
-| Claves primarias | 30 |
-| Claves foráneas | 37 |
-| `UNIQUE` | 4 |
-| `CHECK` | 19 (18 de tabla + 1 de dominio) |
-| Funciones | 8 |
-| Procedimientos | 3 |
-| Triggers | 17 |
-| Índices adicionales | 7 |
-| Rutinas en `pg_proc` | 26 |
+Los casos de prueba citados en la tabla se ejecutan con
+`./tests/run_db_tests.sh` sobre `tests/db_tests.sql`.
 
 ## 4. Carga masiva
 
