@@ -596,7 +596,7 @@ variables `BDA_DATABASE_*`. Contra la base de Compose:
 
 ```bash
 cd api
-BDA_DATABASE_PORT=5433 BDA_DATABASE_PASSWORD=REDACTED \
+BDA_DATABASE_PORT=5433 BDA_DATABASE_PASSWORD='<password-de-.env>' \
   uv run pytest -q
 ```
 
