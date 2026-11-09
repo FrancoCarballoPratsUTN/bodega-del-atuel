@@ -48,10 +48,13 @@ def get_comprobante(
     with connection.cursor(row_factory=dict_row) as cursor:
         cursor.execute(
             """
-            SELECT nro_comprobante, id_cliente, id_sala, fecha,
-                   subtotal, descuento, total
-              FROM comprobante
-             WHERE nro_comprobante = %s
+            SELECT c.nro_comprobante, c.id_cliente, c.id_sala, c.fecha,
+                   i.subtotal_bruto AS subtotal,
+                   i.descuento_total AS descuento,
+                   i.total_neto AS total
+              FROM comprobante c
+              CROSS JOIN LATERAL fn_importes_comprobante(c.nro_comprobante) i
+             WHERE c.nro_comprobante = %s
             """,
             (nro_comprobante,),
         )
