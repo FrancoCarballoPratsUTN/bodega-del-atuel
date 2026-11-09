@@ -117,36 +117,39 @@ dos relaciones de detalle.
 ### S10
 
 El CTE `rendimiento` calcula kilogramos por hectárea para cada parcela y
-campaña. Dos subconsultas correlacionadas calculan el promedio de la finca
-correspondiente y marcan si la parcela está por debajo de ese promedio.
+campaña. Una subconsulta correlacionada calcula el promedio de la finca y el
+`SELECT` externo reutiliza ese valor para marcar si la parcela está por debajo
+del promedio.
 
 ### S11
 
-El CTE `ventas_mensuales` consolida ventas por sala, mes y vino. Luego:
+El CTE `ventas_mensuales` consolida ventas por sala, mes y vino. Sobre ese
+resultado se aplican directamente:
 
-- `RANK() OVER (PARTITION BY id_sala ...)` genera el ranking dentro de cada
-  sala.
-- `SUM(...) OVER (PARTITION BY id_sala, mes ORDER BY cod_vino ...)` genera la
-  suma acumulada mensual.
+- `RANK() OVER (PARTITION BY id_sala ...)` para generar el ranking dentro de
+  cada sala.
+- `SUM(...) OVER (PARTITION BY id_sala, mes ORDER BY cod_vino ...)` para generar
+  la suma acumulada mensual.
 
 ### S12
 
-La primera parte aplica división relacional con `NOT EXISTS` anidados: para
-cada cliente no debe existir un vino de la bodega objetivo que no haya
-comprado. La segunda parte es un anti-join con `NOT EXISTS` para clientes que
-nunca compraron un vino de tipo tinto.
+La bodega objetivo se obtiene con una subconsulta escalar. La primera parte
+aplica división relacional con `NOT EXISTS` anidados: para cada cliente no debe
+existir un vino de esa bodega que no haya comprado. La segunda parte es un
+anti-join con `NOT EXISTS` para clientes que nunca compraron un vino tinto.
 
-En `select.sql`, S9, S10, S11 y S12 incluyen `EXPLAIN (ANALYZE, BUFFERS)`
-antes de su consulta, tal como pide la Etapa 5.
+`select.sql` contiene una única versión de cada consulta. Para reproducir los
+planes pedidos por la Etapa 5 se antepone `EXPLAIN (ANALYZE, BUFFERS)` a S9,
+S10, S11 y S12; las mediciones se ejecutan por separado para no duplicar el SQL.
 
-En la ejecución sobre la carga actual se observaron estos tiempos:
+En la ejecución de las consultas simplificadas se observaron estos tiempos:
 
 | Consulta | Planning time | Execution time |
 |---|---:|---:|
-| S9 | 1,933 ms | 21,421 ms |
-| S10 | 1,318 ms | 74,837 ms |
-| S11 | 0,732 ms | 1.199,791 ms |
-| S12 | 1,113 ms | 21.650,465 ms |
+| S9 | 1,075 ms | 1,059 ms |
+| S10 | 0,695 ms | 39,838 ms |
+| S11 | 0,489 ms | 475,581 ms |
+| S12 | 1,011 ms | 21.169,939 ms |
 
 S12 es deliberadamente una división relacional sobre 20.000 clientes y todos
 los vinos de la bodega elegida; por eso su plan ejecuta muchas comprobaciones
@@ -225,10 +228,11 @@ cat consultas/select.sql | docker exec -i postgresql psql -U postgresql \
   -d bodega_del_atuel -v ON_ERROR_STOP=1
 ```
 
-La ejecución de `select.sql` completó S1-S12 y produjo planes para S9-S12.
-La salida de S11 es grande porque devuelve el ranking mensual de todos los
-vinos y salas; esto es esperado para una consulta de informe y no altera la
-base.
+La ejecución de `select.sql` completó S1-S12 y su salida fue idéntica a la de
+la versión anterior. Los planes de S9-S12 se obtuvieron en una ejecución
+separada anteponiendo `EXPLAIN (ANALYZE, BUFFERS)`. La salida de S11 es grande
+porque devuelve el ranking mensual de todos los vinos y salas; esto es esperado
+para una consulta de informe y no altera la base.
 
 ## Limitaciones conocidas y decisiones
 

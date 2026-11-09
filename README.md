@@ -214,7 +214,7 @@ Los archivos pedidos por el enunciado están en `consultas/`:
 | `insert.sql` | Inserciones I1 a I5. |
 | `update.sql` | Modificaciones U1 a U6. |
 | `delete.sql` | Borrados D1 a D5. |
-| `select.sql` | Consultas S1 a S12 con `EXPLAIN`. |
+| `select.sql` | Consultas S1 a S12; S9-S12 incluyen indicación para medir con `EXPLAIN`. |
 
 Cada archivo está comentado y encapsulado en transacciones con `ROLLBACK`
 cuando corresponde.
